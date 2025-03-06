@@ -1,0 +1,17 @@
+{
+  "date": "2025-03-06T17:04:17.065Z",
+  "preset": "nitro-dev",
+  "framework": {
+    "name": "nuxt",
+    "version": "3.15.4"
+  },
+  "versions": {
+    "nitro": "2.11.3"
+  },
+  "dev": {
+    "pid": 201051,
+    "workerAddress": {
+      "socketPath": "\u0000/home/jakub/projects/emplocity-audio-upload-thing/frontend/.nuxt/dev/worker-201051-1-4695-1.sock"
+    }
+  }
+}

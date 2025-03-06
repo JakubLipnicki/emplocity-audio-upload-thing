@@ -1,0 +1,1 @@
+export { default } from "file:///home/jakub/projects/emplocity-audio-upload-thing/frontend/node_modules/@nuxt/vite-builder/dist/runtime/vite-node.mjs"
