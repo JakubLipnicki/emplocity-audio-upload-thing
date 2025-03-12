@@ -4,8 +4,11 @@ from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 from .models import User
 import datetime
-from django.conf import settings
 import jwt
+from decouple import config
+
+
+SECRET_KEY = config('SECRET_KEY')
 
 
 class RegisterView(APIView):
@@ -34,7 +37,7 @@ class LoginViev(APIView):
             'iat': datetime.datetime.utcnow()
         }
 
-        token = jwt.encode(payload, settings.SECRET_KEY_JWT, algorithm='HS256')
+        token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
         response = Response()
 
@@ -54,7 +57,7 @@ class UserView(APIView):
             raise AuthenticationFailed('Unauthenticated')
         
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY_JWT, algorithms=['HS256'])
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         except jwt.ExpiredSignatureError:
             raise AuthenticationFailed('Unauthenticated')
         
@@ -68,6 +71,6 @@ class LogoutView(APIView):
         response = Response()
         response.delete_cookie('jwt')
         response.data = {
-            'message': 'success'
+            'message': 'Success'
         }
         return response
