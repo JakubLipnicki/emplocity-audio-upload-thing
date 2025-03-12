@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-from decouple import config
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
+SECRET_KEY = 'django-insecure-)jgx%u**f@=vtgzmrn-ck_i$hp@=12(87j%g=7j6@)&o#x016#'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -130,12 +130,7 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+SECRET_KEY_JWT = os.getenv('SECRET_KEY_JWT', 'b2822ef5f420de907cfb85198d0581daa92eaf8d506de3db58dae4b1e505f27991a41c90c8b6054561db600b21af25fdc60125c4aeec17d9f8421e6c7c0209f6e6d87b991d327d589f5b155295ca571293cabeca4e46fa3d8f25d9eacf1923bec3bfa612622b96a2b1e060774e2a74ab172964f28b8534527f188916b85408de2bc5a06c333dca8bf53495c508292e52b36635a171d9f9037b7860591aebcc1daee3521461142d84b6bb3ff1a7bbd80f9805e60baa7338ab9f9e9dc628549de5745a934b2d1e086c9d0a578f6a2b3b4f1a463c3681ab9e67b412183e37a5aaff69dc979c47328dfc71d8e1838cd31a00affe54fd89628d73cd6e4b2c0bcc51ed')
+
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True  
-EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
