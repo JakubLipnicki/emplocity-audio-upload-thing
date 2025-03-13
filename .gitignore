@@ -10,7 +10,7 @@ db.sqlite3
 dist
 
 # Node dependencies
-node_modules
+frontend/node_modules
 
 # Logs
 logs
