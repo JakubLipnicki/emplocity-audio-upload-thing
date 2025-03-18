@@ -3,22 +3,63 @@ from .serializers import UserSerializer
 from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 from .models import User
-import datetime
+from django.core.mail import send_mail
+from django.conf import settings
+from .utils import generate_confirmation_token, confirm_token
 import jwt
+import datetime
 from decouple import config
-
+from rest_framework.permissions import AllowAny
 
 SECRET_KEY = config('SECRET_KEY')
-
 
 class RegisterView(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        user = serializer.save()
+        
+        token = generate_confirmation_token(user.id)
+        verify_link = f"http://127.0.0.1:8000/api/verify-email/?token={token}"
 
-class LoginViev(APIView):
+        send_mail(
+            'Account Verification',
+            f'Click the link to activate your account: {verify_link}',
+            settings.EMAIL_HOST_USER,
+            [user.email],
+            fail_silently=False,
+        )
+
+        return Response({'message': 'Registration successful. Check your email to activate your account.'})
+
+
+class VerifyEmailView(APIView):
+    def get(self, request):
+        token = request.GET.get('token')
+        if not token:
+            return Response({'error': 'Missing token'}, status=400)
+
+        user_id = confirm_token(token)
+        if not user_id:
+            return Response({'error': 'Invalid or expired token'}, status=400)
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+
+        if user.is_active:
+            return Response({'message': 'Account is already active'}, status=400)
+
+
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+
+        return Response({'message': 'Account has been activated!'})
+
+
+
+class LoginView(APIView):
     def post(self, request):
         email = request.data['email']
         password = request.data['password']
@@ -30,7 +71,10 @@ class LoginViev(APIView):
         
         if not user.check_password(password):
             raise AuthenticationFailed('Incorrect password!')
-        
+
+        if not user.is_active:
+            raise AuthenticationFailed('Account not activated. Please check your email.')
+
         payload = {
             'id': user.id,
             'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60),
@@ -40,7 +84,6 @@ class LoginViev(APIView):
         token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
         response = Response()
-
         response.set_cookie(key='jwt', value=token, httponly=True)
 
         response.data = {
@@ -48,6 +91,7 @@ class LoginViev(APIView):
         }
 
         return response
+
 
 class UserView(APIView):
     def get(self, request):
@@ -74,3 +118,4 @@ class LogoutView(APIView):
             'message': 'Success'
         }
         return response
+    
