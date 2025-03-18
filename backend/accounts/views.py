@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 from .models import User
 from django.core.mail import send_mail
-from django.conf import settings
+
 from .utils import generate_confirmation_token, confirm_token
 import jwt
 import datetime
@@ -12,6 +12,7 @@ from decouple import config
 from rest_framework.permissions import AllowAny
 
 SECRET_KEY = config('SECRET_KEY')
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 
 class RegisterView(APIView):
     def post(self, request):
@@ -25,7 +26,7 @@ class RegisterView(APIView):
         send_mail(
             'Account Verification',
             f'Click the link to activate your account: {verify_link}',
-            settings.EMAIL_HOST_USER,
+            EMAIL_HOST_USER,
             [user.email],
             fail_silently=False,
         )
