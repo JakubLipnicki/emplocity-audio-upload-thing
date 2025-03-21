@@ -4,7 +4,6 @@ from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 from .models import User
 from django.core.mail import send_mail
-
 from .utils import generate_confirmation_token, confirm_token
 import jwt
 import datetime
