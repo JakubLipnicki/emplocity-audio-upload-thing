@@ -9,6 +9,7 @@ import jwt
 import datetime
 from decouple import config
 from rest_framework.permissions import AllowAny
+from django.contrib.auth.hashers import check_password
 
 SECRET_KEY = config('SECRET_KEY')
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
@@ -119,4 +120,34 @@ class LogoutView(APIView):
         }
         return response
     
+
+class RequestPasswordResetView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required'}, status=400)
+
+        user = User.objects.filter(email=email).first()
+        if not user:
+            return Response({'error': 'User with this email does not exist'}, status=404)
+
+        if not user.is_active:
+            return Response({'error': 'This account is not activated. Please activate your account first.'}, status=400)
+
+        token = generate_confirmation_token(user.id)
+        reset_link = f"http://127.0.0.1:8000/api/reset-password/?token={token}"
+
+        send_mail(
+            'Password Reset Request',
+            f'Click the link to reset your password: {reset_link}',
+            EMAIL_HOST_USER,
+            [user.email],
+            fail_silently=False,
+        )
+
+        return Response({'message': 'Password reset link has been sent to your email.'})
+
+
 
