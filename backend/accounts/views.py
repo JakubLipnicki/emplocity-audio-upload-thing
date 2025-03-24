@@ -150,4 +150,28 @@ class RequestPasswordResetView(APIView):
         return Response({'message': 'Password reset link has been sent to your email.'})
 
 
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
 
+    def post(self, request):
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+
+        if not token or not new_password:
+            return Response({'error': 'Token and new password are required'}, status=400)
+
+        user_id = confirm_token(token)
+        if not user_id:
+            return Response({'error': 'Invalid or expired token'}, status=400)
+
+        user = User.objects.filter(id=user_id).first()
+        if not user:
+            return Response({'error': 'User not found'}, status=404)
+
+        if User.objects.filter(idne=user.id, passwordexact=new_password).exists():
+            return Response({'error': 'This password is already in use by another account.'}, status=400)
+
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+
+        return Response({'message': 'Password has been reset successfully.'})
