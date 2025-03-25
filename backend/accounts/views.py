@@ -9,7 +9,6 @@ import jwt
 import datetime
 from decouple import config
 from rest_framework.permissions import AllowAny
-from django.contrib.auth.hashers import check_password
 
 SECRET_KEY = config('SECRET_KEY')
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
@@ -175,3 +174,5 @@ class ResetPasswordView(APIView):
         user.save(update_fields=['password'])
 
         return Response({'message': 'Password has been reset successfully.'})
+    
+
