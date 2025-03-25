@@ -167,12 +167,15 @@ class ResetPasswordView(APIView):
         if not user:
             return Response({'error': 'User not found'}, status=404)
 
-        if User.objects.filter(idne=user.id, passwordexact=new_password).exists():
-            return Response({'error': 'This password is already in use by another account.'}, status=400)
+        for u in User.objects.all():
+            if u.check_password(new_password):
+                return Response({'error': 'This password is already in use by another account.'}, status=400)
 
         user.set_password(new_password)
         user.save(update_fields=['password'])
 
         return Response({'message': 'Password has been reset successfully.'})
+
+
     
 
