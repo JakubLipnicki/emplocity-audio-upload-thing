@@ -20,6 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+const router = useRouter();
+
 const formSchema = z
     .object({
         username: z
@@ -41,7 +43,32 @@ const schema = toTypedSchema(formSchema);
 
 const onSubmit = (values: z.infer<typeof formSchema>) => {
     console.log(values);
-    // console.log("Username: ", values.username);
+    // console.log("Username: ", values.username)
+
+    fetch("http://127.0.0.1:8000/api/register", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            name: values.username,
+            email: values.email,
+            password: values.password,
+        }),
+    })
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Registration failed");
+            }
+            return response.json();
+        })
+        .then((data) => {
+            console.log("Registration success:", data);
+            navigateTo(`/profile/${values.username}`);
+        })
+        .catch((error) => {
+            console.error("Registration error:", error);
+        });
 };
 
 // const onSubmit = form.handleSubmit((values) => {
