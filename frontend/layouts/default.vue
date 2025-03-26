@@ -1,9 +1,11 @@
 <template>
     <div>
-        <Navbar />
+        <header class="mb-4">
+            <Navbar />
+        </header>
         <NuxtPage />
 
-        <footer><!-- Your footer --></footer>
+        <footer></footer>
     </div>
 </template>
 
