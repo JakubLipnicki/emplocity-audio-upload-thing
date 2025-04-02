@@ -92,7 +92,9 @@ const onSubmit = async (values) => {
               </FormItem>
             </FormField>
 
-            <a href="#" class="text-sm text-red-900">Forgot password?</a>
+            <div class="mt-4">
+              <a href="/reset-password" class="text-sm ">Nie pamiętam hasła</a>
+            </div>
 
             <Button type="submit" class="w-full font-normal">Zaloguj</Button>
           </div>
