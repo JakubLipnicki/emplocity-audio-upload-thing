@@ -32,11 +32,15 @@ const formSchema = z
 
 const schema = toTypedSchema(formSchema);
 
+function onForgot() {
+  navigateTo("/reset-password/")
+}
 
 const onSubmit = async (values) => {
   try {
     const response = await fetch("http://127.0.0.1:8000/api/login", {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -54,6 +58,7 @@ const onSubmit = async (values) => {
     }
 
     console.log("Login success:", data);
+    navigateTo(`/profile/${values.email}`)
 
   } catch (error) {
     console.error("Login error:", error);
@@ -93,7 +98,7 @@ const onSubmit = async (values) => {
             </FormField>
 
             <div class="mt-4">
-              <a href="/reset-password" class="text-sm ">Nie pamiętam hasła</a>
+              <a @click="onForgot" class="text-sm cursor-pointer">Nie pamiętam hasła</a>
             </div>
 
             <Button type="submit" class="w-full font-normal">Zaloguj</Button>
