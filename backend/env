@@ -1,0 +1,29 @@
+SECRET_KEY=8554ab3eed60b2701844fd4ee67866bc9ba6b8e793c53e42fa5a59789158eb68796ca3dda2a62493454ad99bbe4418b2437ffa8bf6093f06fea6914c2816bb3e3af6b0b46821dc2ce3a050afa14fe0a4bff2ee9ca4f8a19c3a4104f9a559f6443a9ddec72585e7192f0eca98ea4de91f1799124a02d4b1f54d703fbe2cef789d
+EMAIL_HOST_USER="project.django.emplocity@gmail.com"
+EMAIL_HOST_PASSWORD="xvpd gult ycdp leil"
+AWS_ACCESS_KEY_ID=yXjaBezCRQvfVz2WNWm4
+AWS_SECRET_ACCESS_KEY=2PIsh1fj3iRTArUSbhVzCC6mo1tMe4Imkdd6v4mP
+
+
+docker-compose.yml
+
+version: '3.7'
+
+services:
+  minio:
+    image: minio/minio
+    container_name: minio
+    restart: always
+    ports:
+
+"9000:9000"
+"9090:9090"
+environment:
+MINIO_ROOT_USER: yXjaBezCRQvfVz2WNWm4
+MINIO_ROOT_PASSWORD: 2PIsh1fj3iRTArUSbhVzCC6mo1tMe4Imkdd6v4mP
+volumes:
+minio_data:/data
+command: server --console-address ":9090" /data
+
+volumes:
+  minio_data:
