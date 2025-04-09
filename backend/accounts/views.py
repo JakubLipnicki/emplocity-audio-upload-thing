@@ -10,6 +10,7 @@ import datetime
 from decouple import config
 from rest_framework.permissions import AllowAny
 from django.shortcuts import redirect
+from django.conf import settings
 
 SECRET_KEY = config('SECRET_KEY')
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
@@ -21,7 +22,7 @@ class RegisterView(APIView):
         user = serializer.save()
         
         token = generate_confirmation_token(user.id)
-        verify_link = f"http://127.0.0.1:8000/api/verify-email/?token={token}"
+        verify_link = f"{settings.BASE_URL}/api/verify-email/?token={token}"
 
         send_mail(
             'Account Verification',
@@ -99,7 +100,7 @@ class LoginView(APIView):
 
         payload = {
             'id': user.id,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60),
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=settings.TOKEN_EXPIRATION_TIME_HOURS),
             'iat': datetime.datetime.utcnow()
         }
 
@@ -158,7 +159,7 @@ class RequestPasswordResetView(APIView):
             return Response({'error': 'This account is not activated. Please activate your account first.'}, status=400)
 
         token = generate_confirmation_token(user.id)
-        reset_link = f"http://127.0.0.1:8000/api/reset-password/?token={token}"
+        reset_link = f"{settings.BASE_URL}/reset-password/?token={token}"
 
         send_mail(
             'Password Reset Request',
