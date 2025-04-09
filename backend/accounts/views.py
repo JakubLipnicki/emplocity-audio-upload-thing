@@ -9,6 +9,7 @@ import jwt
 import datetime
 from decouple import config
 from rest_framework.permissions import AllowAny
+from django.shortcuts import redirect
 
 SECRET_KEY = config('SECRET_KEY')
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
@@ -34,28 +35,49 @@ class RegisterView(APIView):
 
 
 class VerifyEmailView(APIView):
+    # def get(self, request):
+    #     token = request.GET.get('token')
+    #     if not token:
+    #         return Response({'error': 'Missing token'}, status=400)
+    #
+    #     user_id = confirm_token(token)
+    #     if not user_id:
+    #         return Response({'error': 'Invalid or expired token'}, status=400)
+    #
+    #     try:
+    #         user = User.objects.get(id=user_id)
+    #     except User.DoesNotExist:
+    #         return Response({'error': 'User not found'}, status=404)
+    #
+    #     if user.is_active:
+    #         return Response({'message': 'Account is already active'}, status=400)
+    #
+    #
+    #     user.is_active = True
+    #     user.save(update_fields=['is_active'])
+    #
+    #     return Response({'message': 'Account has been activated!'})
     def get(self, request):
         token = request.GET.get('token')
+        frontend_redirect_url = 'http://localhost:3000/activation'  # Tu potencjalnie do zmienuy bo nie wiem jak masz 
+
         if not token:
-            return Response({'error': 'Missing token'}, status=400)
+            return redirect(frontend_redirect_url)
 
         user_id = confirm_token(token)
         if not user_id:
-            return Response({'error': 'Invalid or expired token'}, status=400)
+            return redirect(frontend_redirect_url)
 
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=404)
+            return redirect(frontend_redirect_url)
 
-        if user.is_active:
-            return Response({'message': 'Account is already active'}, status=400)
+        if not user.is_active:
+            user.is_active = True
+            user.save(update_fields=['is_active'])
 
-
-        user.is_active = True
-        user.save(update_fields=['is_active'])
-
-        return Response({'message': 'Account has been activated!'})
+        return redirect(frontend_redirect_url)
 
 
 
