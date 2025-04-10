@@ -4,7 +4,7 @@ target-version = ['py313']
 exclude = '''
 /(
     migrations
-  | \.venv
+  | venv
   | \.env
   | build
   | dist
@@ -17,7 +17,7 @@ profile = "black"
 known_first_party = ["backend"]
 line_length = 88
 skip = [
-    ".venv",
+    "venv",
     ".env",
     "build",
     "dist",
@@ -30,7 +30,7 @@ plugins = ["mypy_django_plugin.main"]
 exclude = '''
 /(
     migrations
-  | \.venv
+  | venv
   | \.env
   | build
   | dist
