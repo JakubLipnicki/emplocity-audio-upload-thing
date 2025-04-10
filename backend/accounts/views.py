@@ -1,6 +1,5 @@
 import datetime
 
-import APIView
 import jwt
 from decouple import config
 from django.conf import settings
@@ -9,6 +8,7 @@ from django.shortcuts import redirect
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import User
 from .serializers import UserSerializer
@@ -64,6 +64,7 @@ class VerifyEmailView(APIView):
             user.save(update_fields=["is_active"])
 
         return redirect(frontend_redirect_url)
+
 
 class LoginView(APIView):
     def post(self, request):
