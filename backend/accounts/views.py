@@ -1,5 +1,3 @@
-ifrom
-rest_framework.views
 import datetime
 
 import APIView
@@ -7,6 +5,7 @@ import jwt
 from decouple import config
 from django.conf import settings
 from django.core.mail import send_mail
+from django.shortcuts import redirect
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -46,26 +45,25 @@ class RegisterView(APIView):
 class VerifyEmailView(APIView):
     def get(self, request):
         token = request.GET.get("token")
+        frontend_redirect_url = "http://localhost:3000/activation"
+
         if not token:
-            return Response({"error": "Missing token"}, status=400)
+            return redirect(frontend_redirect_url)
 
         user_id = confirm_token(token)
         if not user_id:
-            return Response({"error": "Invalid or expired token"}, status=400)
+            return redirect(frontend_redirect_url)
 
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
+            return redirect(frontend_redirect_url)
 
-        if user.is_active:
-            return Response({"message": "Account is already active"}, status=400)
+        if not user.is_active:
+            user.is_active = True
+            user.save(update_fields=["is_active"])
 
-        user.is_active = True
-        user.save(update_fields=["is_active"])
-
-        return Response({"message": "Account has been activated!"})
-
+        return redirect(frontend_redirect_url)
 
 class LoginView(APIView):
     def post(self, request):
