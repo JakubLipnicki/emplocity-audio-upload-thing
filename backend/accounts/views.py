@@ -137,11 +137,17 @@ class RequestPasswordResetView(APIView):
 
         user = User.objects.filter(email=email).first()
         if not user:
+            return Response(
+                {"error": "Something went wrong, please try again"}, status=404
+            )
 
-            return Response({'error': 'Cos poszło nie tak, spróbuj ponownie'}, status=404)
-    
         if not user.is_active:
-            return Response({'error': 'Konto nie zostało aktywowane, spróbuj ponownie po aktywacji'}, status=400)
+            return Response(
+                {
+                    "error": "Account has not been activated, please try again after activation"
+                },
+                status=400,
+            )
 
         token = generate_confirmation_token(user.id)
         reset_link = f"{settings.BASE_URL}/reset-password/?token={token}"
@@ -154,8 +160,7 @@ class RequestPasswordResetView(APIView):
             fail_silently=False,
         )
 
-
-        return Response({'message': 'Link do resetowania hasła został wysłany ma pocztę'})
+        return Response({"message": "Password reset link has been sent to your email"})
 
 
 class ResetPasswordView(APIView):
