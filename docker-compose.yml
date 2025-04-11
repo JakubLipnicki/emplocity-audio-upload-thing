@@ -23,7 +23,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend_app
-    command: npm start  
+    command: npm run dev  
     ports:
       - "3000:3000"
     depends_on:
