@@ -1,6 +1,5 @@
 /venv/
 db.sqlite3
-*.yml
 
 # Nuxt dev/build outputs
 .output

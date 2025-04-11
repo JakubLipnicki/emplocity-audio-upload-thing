@@ -1,20 +1,20 @@
-# Wybór obrazu bazowego
+# Choosing the base image
 FROM python:3.10-slim
 
-# Ustawienie katalogu roboczego na /app
+# Setting the working directory to /app
 WORKDIR /app
 
-# Kopiowanie pliku requirements.txt do katalogu /app
+# Copying the requirements.txt file to the /app directory
 COPY ./requirements/requirements.txt /app/
 
-# Instalowanie zależności
+# Installing dependencies
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Kopiowanie wszystkich plików z katalogu backend do katalogu /app w kontenerze
+# Copying all files from the backend directory to the /app directory in the container
 COPY . /app/
 
-# Zmienna środowiskowa dla Django
-ENV PYTHONUNBUFFERED 1
+# Environment variable for Django
+ENV PYTHONUNBUFFERED=1
 
-# Uruchamianie aplikacji Django
+# Running the Django application
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

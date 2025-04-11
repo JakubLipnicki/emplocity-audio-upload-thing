@@ -1,20 +1,20 @@
-# Wybór obrazu bazowego
+# Choosing the base image
 FROM node:20
 
-# Ustawienie katalogu roboczego na /app
+# Setting the working directory to /app
 WORKDIR /app
 
-# Kopiowanie package.json i package-lock.json
+# Copying package.json and package-lock.json
 COPY package*.json /app/
 
-# Instalowanie zależności
+# Installing dependencies
 RUN npm install
 
-# Kopiowanie całego katalogu frontend do katalogu /app
+# Copying the entire frontend directory to the /app directory
 COPY . /app/
 
-# Budowanie aplikacji frontendowej
+# Building the frontend application
 RUN npm run build
 
-# Uruchamianie aplikacji w trybie produkcyjnym przy użyciu npx (bez instalacji globalnej)
+# Running the application in production mode using npx (without global installation)
 CMD ["node", "./server/index.mjs"]
