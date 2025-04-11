@@ -147,18 +147,6 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 
 BASE_URL = config("BASE_URL", default="http://127.0.0.1:8000")
 
-<<<<<<< Updated upstream
-# Ustawienia MinIO
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-
-AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY")
-AWS_STORAGE_BUCKET_NAME = "audio-files"
-AWS_S3_ENDPOINT_URL = "http://127.0.0.1:9000"
-AWS_S3_REGION_NAME = "us-east-1"
-AWS_S3_ADDRESSING_STYLE = "path"
-AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}"
-=======
 # MinIO
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
@@ -168,8 +156,6 @@ AWS_STORAGE_BUCKET_NAME = 'audio-files'
 AWS_S3_ENDPOINT_URL = 'http://minio:9000' 
 AWS_S3_REGION_NAME = 'eu-central-1' 
 AWS_S3_ADDRESSING_STYLE = 'path'
->>>>>>> Stashed changes
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
-
