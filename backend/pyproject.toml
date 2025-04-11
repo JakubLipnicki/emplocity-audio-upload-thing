@@ -1,0 +1,42 @@
+[tool.black]
+line-length = 88
+target-version = ['py313']
+exclude = '''
+/(
+    migrations
+  | venv
+  | \.env
+  | build
+  | dist
+  | manage\.py
+)/
+'''
+
+[tool.isort]
+profile = "black"
+known_first_party = ["backend"]
+line_length = 88
+skip = [
+    "venv",
+    ".env",
+    "build",
+    "dist",
+    "manage.py",
+    "migrations"
+]
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+exclude = '''
+/(
+    migrations
+  | venv
+  | \.env
+  | build
+  | dist
+  | manage\.py
+)/
+'''
+
+[tool.django-stubs]
+django_settings_module = "project.settings"
