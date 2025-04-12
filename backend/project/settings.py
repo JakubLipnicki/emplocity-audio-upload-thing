@@ -137,13 +137,15 @@ CORS_ALLOW_CREDENTIALS = True
 
 TOKEN_EXPIRATION_TIME_HOURS = 1
 
-
+# Email
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = config("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+EMAIL_HOST = "mailhog" 
+EMAIL_PORT = 1025
+EMAIL_HOST_USER = ""
+EMAIL_HOST_PASSWORD = ""
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = False
+DEFAULT_FROM_EMAIL = "no-reply@example.com"
 
 BASE_URL = config("BASE_URL", default="http://127.0.0.1:8000")
 
