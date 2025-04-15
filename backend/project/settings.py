@@ -161,3 +161,8 @@ AWS_S3_ADDRESSING_STYLE = "path"
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
+AWS_S3_CUSTOM_DOMAIN = "localhost:9000" 
+
+
+
+AUDIO_FILE_BASE_URL = "http://localhost:9000/audio-files/"
