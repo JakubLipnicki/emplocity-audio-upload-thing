@@ -24,7 +24,7 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        token = generate_confirmation_token(user.id)
+        token = generate_confirmation_token(user.id, token_type="activation")
         verify_link = f"{settings.BASE_URL}/api/verify-email/?token={token}"
 
         send_mail(
@@ -35,11 +35,9 @@ class RegisterView(APIView):
             fail_silently=False,
         )
 
-        return Response(
-            {
-                "message": "Registration successful. Check your email to activate your account."
-            }
-        )
+        return Response({
+            "message": "Registration successful. Check your email to activate your account."
+        })
 
 
 class VerifyEmailView(APIView):
@@ -50,7 +48,7 @@ class VerifyEmailView(APIView):
         if not token:
             return redirect(frontend_redirect_url)
 
-        user_id = confirm_token(token)
+        user_id = confirm_token(token, expected_type="activation")
         if not user_id:
             return redirect(frontend_redirect_url)
 
@@ -143,13 +141,11 @@ class RequestPasswordResetView(APIView):
 
         if not user.is_active:
             return Response(
-                {
-                    "error": "Account has not been activated, please try again after activation"
-                },
+                {"error": "Account has not been activated, please try again after activation"},
                 status=400,
             )
 
-        token = generate_confirmation_token(user.id)
+        token = generate_confirmation_token(user.id, token_type="password_reset")
         reset_link = f"{settings.BASE_URL}/reset-password/?token={token}"
 
         send_mail(
@@ -175,20 +171,13 @@ class ResetPasswordView(APIView):
                 {"error": "Token and new password are required"}, status=400
             )
 
-        user_id = confirm_token(token)
+        user_id = confirm_token(token, expected_type="password_reset")
         if not user_id:
             return Response({"error": "Invalid or expired token"}, status=400)
 
         user = User.objects.filter(id=user_id).first()
         if not user:
             return Response({"error": "User not found"}, status=404)
-
-        for u in User.objects.all():
-            if u.check_password(new_password):
-                return Response(
-                    {"error": "This password is already in use by another account."},
-                    status=400,
-                )
 
         user.set_password(new_password)
         user.save(update_fields=["password"])

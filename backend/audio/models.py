@@ -1,13 +1,13 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 from storages.backends.s3boto3 import S3Boto3Storage
+from value_object import ALLOWED_AUDIO_EXTENSIONS 
 
 
 def validate_audio_file_extension(value):
-    allowed_extensions = (".mp3", ".wav", ".m4a", ".ogg", ".flac")
-    if not value.name.lower().endswith(allowed_extensions):
+    if not value.name.lower().endswith(ALLOWED_AUDIO_EXTENSIONS):
         raise ValidationError(
-            f"Allowed audio file formats: {', '.join(allowed_extensions)}."
+            f"Allowed audio file formats: {', '.join(ALLOWED_AUDIO_EXTENSIONS)}."
         )
 
 

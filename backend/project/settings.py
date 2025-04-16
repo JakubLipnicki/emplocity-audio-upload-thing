@@ -139,13 +139,14 @@ TOKEN_EXPIRATION_TIME_HOURS = 1
 
 # Email
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "mailhog" 
-EMAIL_PORT = 1025
-EMAIL_HOST_USER = ""
-EMAIL_HOST_PASSWORD = ""
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = False
-DEFAULT_FROM_EMAIL = "no-reply@example.com"
+EMAIL_HOST = config("EMAIL_HOST")
+EMAIL_PORT = config("EMAIL_PORT", cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+
 
 BASE_URL = config("BASE_URL", default="http://127.0.0.1:8000")
 
@@ -161,8 +162,7 @@ AWS_S3_ADDRESSING_STYLE = "path"
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
-AWS_S3_CUSTOM_DOMAIN = "localhost:9000" 
-
+AWS_S3_CUSTOM_DOMAIN = "localhost:9000"
 
 
 AUDIO_FILE_BASE_URL = "http://localhost:9000/audio-files/"
