@@ -12,7 +12,9 @@ from rest_framework.views import APIView
 
 from .models import User
 from .serializers import UserSerializer
-from .utils import confirm_token, generate_confirmation_token
+from .utils import (decode_token, decode_verification_token,
+                    generate_access_token, generate_refresh_token,
+                    generate_verification_token)
 
 SECRET_KEY = config("SECRET_KEY")
 EMAIL_HOST_USER = config("EMAIL_HOST_USER")
@@ -24,20 +26,22 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        token = generate_confirmation_token(user.id, token_type="activation")
+        token = generate_verification_token(user.id)
         verify_link = f"{settings.BASE_URL}/api/verify-email/?token={token}"
 
         send_mail(
             "Account Verification",
             f"Click the link to activate your account: {verify_link}",
-            EMAIL_HOST_USER,
+            settings.EMAIL_HOST_USER,
             [user.email],
             fail_silently=False,
         )
 
-        return Response({
-            "message": "Registration successful. Check your email to activate your account."
-        })
+        return Response(
+            {
+                "message": "Registration successful. Check your email to activate your account."
+            }
+        )
 
 
 class VerifyEmailView(APIView):
@@ -48,7 +52,7 @@ class VerifyEmailView(APIView):
         if not token:
             return redirect(frontend_redirect_url)
 
-        user_id = confirm_token(token, expected_type="activation")
+        user_id = decode_verification_token(token)
         if not user_id:
             return redirect(frontend_redirect_url)
 
@@ -82,36 +86,46 @@ class LoginView(APIView):
                 "Account not activated. Please check your email."
             )
 
-        payload = {
-            "id": user.id,
-            "exp": datetime.datetime.utcnow()
-            + datetime.timedelta(hours=settings.TOKEN_EXPIRATION_TIME_HOURS),
-            "iat": datetime.datetime.utcnow(),
-        }
-
-        token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+        access_token = generate_access_token(user.id)
+        refresh_token = generate_refresh_token(user.id)
 
         response = Response()
-        response.set_cookie(key="jwt", value=token, httponly=True)
 
-        response.data = {"jwt": token}
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,
+            samesite="Lax",
+            max_age=15 * 60,
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=True,
+            samesite="Lax",
+            max_age=7 * 24 * 60 * 60,
+        )
+
+        response.data = {"message": "Logged in successfully"}
 
         return response
 
 
 class UserView(APIView):
     def get(self, request):
-        token = request.COOKIES.get("jwt")
+        token = request.COOKIES.get("access_token")
 
         if not token:
             raise AuthenticationFailed("Unauthenticated")
 
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
+            payload = decode_token(token, expected_type="access")
+        except AuthenticationFailed:
             raise AuthenticationFailed("Unauthenticated")
 
-        user = User.objects.filter(id=payload["id"]).first()
+        user = User.objects.filter(id=payload["user_id"]).first()
         serializer = UserSerializer(user)
 
         return Response(serializer.data)
@@ -120,7 +134,8 @@ class UserView(APIView):
 class LogoutView(APIView):
     def post(self, request):
         response = Response()
-        response.delete_cookie("jwt")
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
         response.data = {"message": "Success"}
         return response
 
@@ -141,11 +156,13 @@ class RequestPasswordResetView(APIView):
 
         if not user.is_active:
             return Response(
-                {"error": "Account has not been activated, please try again after activation"},
+                {
+                    "error": "Account has not been activated, please try again after activation"
+                },
                 status=400,
             )
 
-        token = generate_confirmation_token(user.id, token_type="password_reset")
+        token = generate_verification_token(user.id)
         reset_link = f"{settings.BASE_URL}/reset-password/?token={token}"
 
         send_mail(
@@ -171,7 +188,7 @@ class ResetPasswordView(APIView):
                 {"error": "Token and new password are required"}, status=400
             )
 
-        user_id = confirm_token(token, expected_type="password_reset")
+        user_id = decode_verification_token(token)
         if not user_id:
             return Response({"error": "Invalid or expired token"}, status=400)
 
@@ -183,3 +200,34 @@ class ResetPasswordView(APIView):
         user.save(update_fields=["password"])
 
         return Response({"message": "Password has been reset successfully."})
+
+
+class RefreshTokenView(APIView):
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if not refresh_token:
+            raise AuthenticationFailed("Refresh token not found")
+
+        try:
+            payload = decode_token(refresh_token, expected_type="refresh")
+        except AuthenticationFailed:
+            raise AuthenticationFailed("Invalid or expired refresh token")
+
+        user_id = payload["user_id"]
+
+        access_token = generate_access_token(user_id)
+        response = Response()
+
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,
+            samesite="Lax",
+            max_age=15 * 60,
+        )
+
+        response.data = {"message": "Access token refreshed successfully"}
+
+        return response
