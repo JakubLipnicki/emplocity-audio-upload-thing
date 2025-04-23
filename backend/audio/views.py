@@ -10,3 +10,8 @@ class AudioFileUploadView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save()
+
+
+class LatestAudioFilesView(generics.ListAPIView):
+    queryset = AudioFile.objects.all().order_by("-uploaded_at")[:10]
+    serializer_class = AudioFileSerializer
