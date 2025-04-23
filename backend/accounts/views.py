@@ -14,7 +14,7 @@ from .models import User
 from .serializers import UserSerializer
 from .utils import (decode_token, decode_verification_token,
                     generate_access_token, generate_refresh_token,
-                    generate_verification_token)
+                    generate_verification_token, generate_password_reset_token, decode_password_reset_token)
 
 SECRET_KEY = config("SECRET_KEY")
 EMAIL_HOST_USER = config("EMAIL_HOST_USER")
@@ -162,9 +162,8 @@ class RequestPasswordResetView(APIView):
                 status=400,
             )
 
-        token = generate_verification_token(user.id)
-        reset_link = f"http://127.0.0.1:3000/reset-password/?token={token}"
-        # TODO change link to variable
+        token = generate_password_reset_token(user.id)
+        reset_link = f"{settings.BASE_URL}/reset-password/?token={token}"
 
         send_mail(
             "Password Reset Request",
@@ -189,7 +188,7 @@ class ResetPasswordView(APIView):
                 {"error": "Token and new password are required"}, status=400
             )
 
-        user_id = decode_verification_token(token)
+        user_id = decode_password_reset_token(token)
         if not user_id:
             return Response({"error": "Invalid or expired token"}, status=400)
 
