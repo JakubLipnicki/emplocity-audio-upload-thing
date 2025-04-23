@@ -150,7 +150,8 @@ class RequestPasswordResetView(APIView):
             )
 
         token = generate_confirmation_token(user.id)
-        reset_link = f"{settings.BASE_URL}/reset-password/?token={token}"
+        reset_link = f"http://127.0.0.1:3000/reset-password/?token={token}"
+        # TODO change link to variable
 
         send_mail(
             "Password Reset Request",
