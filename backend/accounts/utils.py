@@ -85,4 +85,3 @@ def decode_password_reset_token(token):
         raise AuthenticationFailed("Password reset token expired")
     except jwt.InvalidTokenError:
         raise AuthenticationFailed("Invalid password reset token")
-

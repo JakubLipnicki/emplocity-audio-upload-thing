@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 from storages.backends.s3boto3 import S3Boto3Storage
+
 from value_object import ALLOWED_AUDIO_EXTENSIONS
 
 
