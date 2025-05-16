@@ -37,6 +37,18 @@ services:
       - "3000:3000"
     depends_on:
       - django
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    develop:
+      watch:
+        - action: rebuild
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .nuxt/
+            - dist/
 
   mailhog:
     image: mailhog/mailhog

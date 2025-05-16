@@ -39,8 +39,10 @@ const onSubmit = async (values: z.infer<typeof formSchema>) => {
   errorMessage.value = "";
   formSuccess.value = false;
 
+  const config = useRuntimeConfig();
+
   try {
-    const response = await fetch("http://127.0.0.1:8000/api/request-password-reset/", {
+    const response = await fetch(`${config.public.apiRoot}/api/request-password-reset/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
