@@ -137,8 +137,10 @@ const onSubmit = async () => {
   isLoading.value = true
   errorMessage.value = ''
 
+  const config = useRuntimeConfig();
+
   try {
-    const response = await fetch('http://localhost:8000/api/reset-password/', {
+    const response = await fetch(`${config.public.apiRoot}/api/reset-password/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

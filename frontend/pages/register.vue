@@ -45,7 +45,9 @@ const onSubmit = (values: z.infer<typeof formSchema>) => {
     console.log(values);
     // console.log("Username: ", values.username)
 
-    fetch("http://127.0.0.1:8000/api/register", {
+    const config = useRuntimeConfig();
+
+    fetch(`${config.public.apiRoot}/api/register`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

@@ -142,6 +142,8 @@ const uploadFile = async () => {
   if (!isValid.value) return
   
   isUploading.value = true
+
+  const config = useRuntimeConfig();
   
   try {
     const formData = new FormData()
@@ -151,7 +153,8 @@ const uploadFile = async () => {
     }
     formData.append('file', selectedFile.value)
     
-    const response = await fetch('http://127.0.0.1:8000/api/audio/upload/', {
+
+    const response = await fetch(`${config.public.apiRoot}/api/audio/upload/`, {
       method: 'POST',
       body: formData,
       credentials: 'include' 

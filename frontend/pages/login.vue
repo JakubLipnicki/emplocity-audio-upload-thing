@@ -37,8 +37,11 @@ function onForgot() {
 }
 
 const onSubmit = async (values) => {
+
+  const config = useRuntimeConfig();
+
   try {
-    const response = await fetch("http://127.0.0.1:8000/api/login", {
+    const response = await fetch(`${config.public.apiRoot}/api/login`, {
       method: "POST",
       credentials: "include",
       headers: {
