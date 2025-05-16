@@ -47,7 +47,7 @@ def generate_verification_token(user_id):
     payload = {
         "user_id": user_id,
         "type": "email_verification",
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
         "iat": datetime.datetime.utcnow(),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
@@ -63,3 +63,25 @@ def decode_verification_token(token):
         raise AuthenticationFailed("Verification token expired")
     except jwt.InvalidTokenError:
         raise AuthenticationFailed("Invalid verification token")
+
+
+def generate_password_reset_token(user_id):
+    payload = {
+        "user_id": user_id,
+        "type": "password_reset",
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=15),
+        "iat": datetime.datetime.utcnow(),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+
+def decode_password_reset_token(token):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        if payload.get("type") != "password_reset":
+            raise AuthenticationFailed("Invalid password reset token")
+        return payload["user_id"]
+    except jwt.ExpiredSignatureError:
+        raise AuthenticationFailed("Password reset token expired")
+    except jwt.InvalidTokenError:
+        raise AuthenticationFailed("Invalid password reset token")
