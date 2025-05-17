@@ -6,7 +6,7 @@ from .models import AudioFile
 class AudioFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = AudioFile
-        fields = ["id", "title", "description", "file", "uploaded_at"]
+        fields = ["id", "uuid", "title", "description", "file", "uploaded_at"]
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
