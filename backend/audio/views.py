@@ -1,11 +1,14 @@
-from rest_framework import generics, permissions
-from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Q
-from rest_framework.views import APIView
+from rest_framework import generics, permissions
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from accounts.authentication import JWTAuthentication
+
 from .models import AudioFile
 from .serializers import AudioFileSerializer
-from accounts.authentication import JWTAuthentication
+
 
 class AudioFileUploadView(generics.ListCreateAPIView):
     serializer_class = AudioFileSerializer
@@ -32,23 +35,27 @@ class AudioFileUploadView(generics.ListCreateAPIView):
 
         serializer.save(user=user, is_public=is_public)
 
+
 class LatestAudioFilesView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        page = int(request.query_params.get('page', 1))
+        page = int(request.query_params.get("page", 1))
         page_size = 10
         offset = (page - 1) * page_size
-        queryset = AudioFile.objects.filter(is_public=True).order_by('-uploaded_at')
-        results = list(queryset[offset:offset + page_size])
+        queryset = AudioFile.objects.filter(is_public=True).order_by("-uploaded_at")
+        results = list(queryset[offset : offset + page_size])
         serializer = AudioFileSerializer(results, many=True)
 
         has_more = queryset.count() > offset + page_size
-        return Response({
-            "results": serializer.data,
-            "has_more": has_more,
-            "page": page,
-        })
+        return Response(
+            {
+                "results": serializer.data,
+                "has_more": has_more,
+                "page": page,
+            }
+        )
+
 
 class AudioFileDetailByUUIDView(generics.RetrieveAPIView):
     serializer_class = AudioFileSerializer
@@ -61,3 +68,13 @@ class AudioFileDetailByUUIDView(generics.RetrieveAPIView):
         if user and user.is_authenticated:
             return AudioFile.objects.filter(Q(is_public=True) | Q(user=user))
         return AudioFile.objects.filter(Q(is_public=True) | Q(user__isnull=True))
+
+
+class AudioFileDeleteView(generics.DestroyAPIView):
+    serializer_class = AudioFileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    lookup_field = "uuid"
+
+    def get_queryset(self):
+        return AudioFile.objects.filter(user=self.request.user)
