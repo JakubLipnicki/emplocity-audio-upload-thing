@@ -1,6 +1,8 @@
 from rest_framework import generics, permissions
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Q
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from .models import AudioFile
 from .serializers import AudioFileSerializer
 from accounts.authentication import JWTAuthentication
@@ -28,15 +30,25 @@ class AudioFileUploadView(generics.ListCreateAPIView):
         else:
             is_public = False
 
-        if not user and not is_public:
-            raise PermissionError("Anonymous users must set is_public=True.")
-
         serializer.save(user=user, is_public=is_public)
 
-class LatestAudioFilesView(generics.ListAPIView):
-    queryset = AudioFile.objects.filter(is_public=True).order_by("-uploaded_at")[:10]
-    serializer_class = AudioFileSerializer
+class LatestAudioFilesView(APIView):
     permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        page = int(request.query_params.get('page', 1))
+        page_size = 10
+        offset = (page - 1) * page_size
+        queryset = AudioFile.objects.filter(is_public=True).order_by('-uploaded_at')
+        results = list(queryset[offset:offset + page_size])
+        serializer = AudioFileSerializer(results, many=True)
+
+        has_more = queryset.count() > offset + page_size
+        return Response({
+            "results": serializer.data,
+            "has_more": has_more,
+            "page": page,
+        })
 
 class AudioFileDetailByUUIDView(generics.RetrieveAPIView):
     serializer_class = AudioFileSerializer
