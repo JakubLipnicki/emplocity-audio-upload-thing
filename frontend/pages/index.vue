@@ -1,18 +1,27 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue"; 
+import { ref, onMounted } from "vue";
 import {
   Card,
   CardContent,
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button"; 
+import { ThumbsUp, ThumbsDown } from "lucide-vue-next"; 
 
-interface AudioFile {
+interface ApiAudioFile {
   id: number;
   title: string;
   uploaded_at: string;
-  file: string; 
-  description: string | null; 
+  file: string;
+  description: string | null;
+}
+
+// Dummy like n dislike data
+interface AudioFile extends ApiAudioFile {
+  likes: number;
+  dislikes: number;
+  userVote: 'like' | 'dislike' | null; 
 }
 
 const latestAudioFiles = ref<AudioFile[]>([]);
@@ -34,8 +43,13 @@ const fetchAudioFiles = async () => {
       return;
     }
 
-    const data: AudioFile[] = await response.json();
-    latestAudioFiles.value = data;
+    const data: ApiAudioFile[] = await response.json();
+    latestAudioFiles.value = data.map(file => ({
+      ...file,
+      likes: Math.floor(Math.random() * 100), 
+      dislikes: Math.floor(Math.random() * 30), 
+      userVote: null, 
+    }));
   } catch (e: any) {
     error.value = `Error fetching audio files: ${e.message}`;
     console.error("Fetch error:", e);
@@ -55,6 +69,32 @@ const formatDate = (dateString: string) => {
     day: "numeric",
   };
   return new Date(dateString).toLocaleDateString(undefined, options);
+};
+
+const handleVote = (file: AudioFile, voteType: 'like' | 'dislike') => {
+  if (voteType === 'like') {
+    if (file.userVote === 'like') { 
+      file.likes--;
+      file.userVote = null;
+    } else { 
+      if (file.userVote === 'dislike') {
+        file.dislikes--; 
+      }
+      file.likes++;
+      file.userVote = 'like';
+    }
+  } else if (voteType === 'dislike') {
+    if (file.userVote === 'dislike') { 
+      file.dislikes--;
+      file.userVote = null;
+    } else { 
+      if (file.userVote === 'like') {
+        file.likes--; 
+      }
+      file.dislikes++;
+      file.userVote = 'dislike';
+    }
+  }
 };
 
 </script>
@@ -82,12 +122,42 @@ const formatDate = (dateString: string) => {
               >Opublikowane:
               {{ formatDate(audioFile.uploaded_at) }}</CardDescription
             >
-            <CardDescription v-if="audioFile.description" class="mb-2"> Opis: {{ audioFile.description }}
+            <CardDescription v-if="audioFile.description" class="mb-2">
+                Opis: {{ audioFile.description }}
             </CardDescription>
-            <CardDescription v-else class="mb-2 text-sm text-gray-500"> Opis: Brak opisu
+            <CardDescription v-else class="mb-2 text-sm text-gray-500">
+                Opis: Brak opisu
             </CardDescription>
-            <audio controls :src="audioFile.file" class="w-full mt-4"> Your browser does not support the audio element.
+            <audio controls :src="audioFile.file" class="w-full mt-4">
+              Your browser does not support the audio element.
             </audio>
+
+            <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-start space-x-6">
+              <div class="flex items-center space-x-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  @click="handleVote(audioFile, 'like')"
+                  :class="{ 'text-blue-500': audioFile.userVote === 'like' }"
+                  aria-label="Like"
+                >
+                  <ThumbsUp class="h-5 w-5" :class="{ 'fill-blue-500 dark:fill-blue-700 opacity-50': audioFile.userVote === 'like' }" />
+                </Button>
+                <span class="text-sm min-w-[20px] text-center">{{ audioFile.likes }}</span>
+              </div>
+              <div class="flex items-center space-x-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  @click="handleVote(audioFile, 'dislike')"
+                  :class="{ 'text-red-500': audioFile.userVote === 'dislike' }"
+                  aria-label="Dislike"
+                >
+                  <ThumbsDown class="h-5 w-5" :class="{ 'fill-red-500 dark:fill-red-700 opacity-50': audioFile.userVote === 'dislike' }" />
+                </Button>
+                <span class="text-sm min-w-[20px] text-center">{{ audioFile.dislikes }}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
