@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue"; 
 import {
   Card,
   CardContent,
@@ -11,6 +11,8 @@ interface AudioFile {
   id: number;
   title: string;
   uploaded_at: string;
+  file: string; 
+  description: string | null; 
 }
 
 const latestAudioFiles = ref<AudioFile[]>([]);
@@ -55,7 +57,6 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString(undefined, options);
 };
 
-import { onMounted } from "vue";
 </script>
 
 <template>
@@ -77,11 +78,16 @@ import { onMounted } from "vue";
         <Card v-for="audioFile in latestAudioFiles" :key="audioFile.id">
           <CardContent class="p-6">
             <CardTitle>{{ audioFile.title }}</CardTitle>
-            <CardDescription
+            <CardDescription class="mb-2"
               >Opublikowane:
               {{ formatDate(audioFile.uploaded_at) }}</CardDescription
             >
-            <CardDescription>Opis: {{ audioFile.description }}</CardDescription>
+            <CardDescription v-if="audioFile.description" class="mb-2"> Opis: {{ audioFile.description }}
+            </CardDescription>
+            <CardDescription v-else class="mb-2 text-sm text-gray-500"> Opis: Brak opisu
+            </CardDescription>
+            <audio controls :src="audioFile.file" class="w-full mt-4"> Your browser does not support the audio element.
+            </audio>
           </CardContent>
         </Card>
       </div>
