@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
 from storages.backends.s3boto3 import S3Boto3Storage
-
 from value_object import ALLOWED_AUDIO_EXTENSIONS
 
 User = get_user_model()
@@ -44,3 +43,19 @@ class AudioFile(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Like(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="likes")
+    audio_file = models.ForeignKey(
+        AudioFile, on_delete=models.CASCADE, related_name="likes"
+    )
+    is_liked = models.BooleanField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "audio_file")
+
+    def __str__(self):
+        return f"{self.user.email} - {self.audio_file.title} - {'Like' if self.is_liked else 'Dislike'}"
