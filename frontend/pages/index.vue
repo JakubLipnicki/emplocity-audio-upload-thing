@@ -50,6 +50,7 @@ const fetchAudioFiles = async () => {
       dislikes: Math.floor(Math.random() * 30), 
       userVote: null, 
     }));
+    console.log(latestAudioFiles)
   } catch (e: any) {
     error.value = `Error fetching audio files: ${e.message}`;
     console.error("Fetch error:", e);
