@@ -22,6 +22,13 @@ def audio_file_upload_to(instance, filename):
     return f"{instance.uuid}.{extension}"
 
 
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
 class AudioFile(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     user = models.ForeignKey(
@@ -40,6 +47,7 @@ class AudioFile(models.Model):
     )
     is_public = models.BooleanField(default=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    tags = models.ManyToManyField(Tag, related_name="audio_files", blank=True)
 
     def __str__(self):
         return self.title

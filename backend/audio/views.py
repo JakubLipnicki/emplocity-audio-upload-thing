@@ -6,8 +6,10 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import AudioFile, Like
-from .serializers import AudioFileSerializer, LikeSerializer
+from accounts.authentication import JWTAuthentication
+
+from .models import AudioFile, Like, Tag
+from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
 
 
 class AudioFileUploadView(generics.ListCreateAPIView):
@@ -89,10 +91,11 @@ class AddLikeView(APIView):
             raise NotFound("Audio file not found.")
 
         is_liked = request.data.get("is_liked")
+
         if is_liked is None:
             raise ValidationError({"is_liked": "This field is required."})
 
-        like, _ = Like.objects.update_or_create(
+        like, created = Like.objects.update_or_create(
             user=request.user,
             audio_file=audio_file,
             defaults={"is_liked": is_liked},
@@ -126,7 +129,26 @@ class AudioFileLikesCountView(APIView):
         likes_count = audio_file.likes.filter(is_liked=True).count()
         dislikes_count = audio_file.likes.filter(is_liked=False).count()
 
-        return Response({
-            "likes": likes_count,
-            "dislikes": dislikes_count,
-        })
+        return Response(
+            {
+                "likes": likes_count,
+                "dislikes": dislikes_count,
+            }
+        )
+
+
+class TagListView(generics.ListAPIView):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = [permissions.AllowAny]
+
+
+class AudioFilesByTagView(generics.ListAPIView):
+    serializer_class = AudioFileSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        tag_name = self.kwargs["tag_name"]
+        return AudioFile.objects.filter(tags__name=tag_name, is_public=True).order_by(
+            "-uploaded_at"
+        )
