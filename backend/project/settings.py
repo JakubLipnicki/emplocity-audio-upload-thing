@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "storages",
     "accounts",
     "audio",
+    "comments",
 ]
 AUTH_USER_MODEL = "accounts.User"
 

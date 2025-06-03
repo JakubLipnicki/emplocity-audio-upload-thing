@@ -1,6 +1,7 @@
-from accounts.utils import decode_token
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import BaseAuthentication
+
+from accounts.utils import decode_token
 
 User = get_user_model()
 
