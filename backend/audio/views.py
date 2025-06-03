@@ -1,15 +1,14 @@
 from accounts.authentication import JWTAuthentication
-from django.db.models import Q
+from django.db.models import Q, Count, F, FloatField, ExpressionWrapper, Value
 from rest_framework import generics, permissions
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.authentication import JWTAuthentication
-
 from .models import AudioFile, Like, Tag
 from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
+
 
 
 class AudioFileUploadView(generics.ListCreateAPIView):
@@ -68,6 +67,12 @@ class AudioFileDetailByUUIDView(generics.RetrieveAPIView):
         if user and user.is_authenticated:
             return AudioFile.objects.filter(Q(is_public=True) | Q(user=user))
         return AudioFile.objects.filter(is_public=True)
+
+    def get_object(self):
+        obj = super().get_object()
+        obj.views = getattr(obj, "views", 0) + 1
+        obj.save(update_fields=["views"])
+        return obj
 
 
 class AudioFileDeleteView(generics.DestroyAPIView):
@@ -136,6 +141,27 @@ class AudioFileLikesCountView(APIView):
             }
         )
 
+class TopRatedAudioFilesView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        queryset = (
+            AudioFile.objects.filter(is_public=True)
+            .annotate(
+                likes_count=Count("likes", filter=F("likes__is_liked")),
+                dislikes_count=Count("likes", filter=~F("likes__is_liked")),
+            )
+            .annotate(
+                like_ratio=ExpressionWrapper(
+                    F("likes_count") / (F("dislikes_count") + Value(1)),
+                    output_field=FloatField(),
+                )
+            )
+            .order_by("-like_ratio", "-uploaded_at")
+        )
+
+        serializer = AudioFileSerializer(queryset, many=True)
+        return Response(serializer.data)
 
 class TagListView(generics.ListAPIView):
     queryset = Tag.objects.all()
