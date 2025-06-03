@@ -10,6 +10,7 @@ from .views import (
     LatestAudioFilesView,
     TagListView,
     UserLikedAudioFilesView,
+    TopRatedAudioFilesView,
 )
 
 urlpatterns = [
@@ -22,5 +23,6 @@ urlpatterns = [
     path("liked/", UserLikedAudioFilesView.as_view(), name="user-liked-audio"),
     path("tags/", TagListView.as_view(), name="tag-list"),
     path("tags/<str:tag_name>/", AudioFilesByTagView.as_view(), name="audio-by-tag"),
+    path("top-rated/", TopRatedAudioFilesView.as_view(), name="top-rated-audio"),
 ]
 
