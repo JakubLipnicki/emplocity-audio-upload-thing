@@ -22,4 +22,7 @@ urlpatterns = [
     path("api/", include("accounts.urls")),
     path("admin/", admin.site.urls),
     path("api/audio/", include("audio.urls")),
+    # Include URLs from the 'payments' application, namespaced as 'payments'.
+    # All URLs from payments.urls will be prefixed with 'api/payments/'.
+    path("api/payments/", include("payments.urls", namespace="payments")), # New entry for payments app
 ]

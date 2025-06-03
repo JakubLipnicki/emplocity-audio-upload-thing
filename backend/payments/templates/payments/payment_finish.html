@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title|default:"Status Płatności" }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; padding: 0; background-color: #f4f4f4; color: #333; text-align: center; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); display: inline-block; }
+        h1 { color: #333; }
+        p { font-size: 1.1em; }
+        .error-message { color: #d9534f; font-weight: bold; }
+        .success-message { color: #5cb85c; } /* Not used directly now, but for future */
+        a { color: #007bff; text-decoration: none; margin-top: 20px; display: inline-block; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ page_title|default:"Status Płatności" }}</h1>
+
+        {% if is_error %}
+            <p class="error-message">{{ message }}</p>
+        {% else %}
+            <p>{{ message }}</p>
+        {% endif %}
+
+        <p><a href="/">Wróć na stronę główną</a></p>
+        <!--
+            W bardziej zaawansowanej wersji, możesz chcieć tutaj dodać link do
+            historii zamówień użytkownika lub próbować odświeżyć status zamówienia
+            za pomocą JavaScript, odpytując Twój backend.
+        -->
+    </div>
+</body>
+</html>
