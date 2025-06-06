@@ -10,9 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+import os  # Dodajemy import os, na wszelki wypadek
 from pathlib import Path
-import os # Dodajemy import os, na wszelki wypadek
-from decouple import config # Zakładam, że masz to już zaimportowane
+
+from decouple import config  # Zakładam, że masz to już zaimportowane
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,9 +26,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", default=True, cast=bool) # Twoje istniejące ustawienie
+DEBUG = config("DEBUG", default=True, cast=bool)  # Twoje istniejące ustawienie
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="127.0.0.1,localhost", cast=lambda v: [s.strip() for s in v.split(',')]) # Twoje istniejące ustawienie
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="127.0.0.1,localhost",
+    cast=lambda v: [s.strip() for s in v.split(",")],
+)  # Twoje istniejące ustawienie
 
 
 # Application definition
@@ -47,12 +52,12 @@ INSTALLED_APPS = [
     "payments",  # Dodano w jednej gałęzi
     "comments",  # Dodano w drugiej gałęzi
 ]
-AUTH_USER_MODEL = "accounts.User" # Twoje istniejące ustawienie
+AUTH_USER_MODEL = "accounts.User"  # Twoje istniejące ustawienie
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware", # Twoje istniejące ustawienie
+    "corsheaders.middleware.CorsMiddleware",  # Twoje istniejące ustawienie
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -60,12 +65,12 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "project.urls" # Twoje istniejące ustawienie
+ROOT_URLCONF = "project.urls"  # Twoje istniejące ustawienie
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, 'templates')], # Twoje istniejące ustawienie
+        "DIRS": [os.path.join(BASE_DIR, "templates")],  # Twoje istniejące ustawienie
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -78,7 +83,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "project.wsgi.application" # Twoje istniejące ustawienie
+WSGI_APPLICATION = "project.wsgi.application"  # Twoje istniejące ustawienie
 
 
 # Database
@@ -90,8 +95,8 @@ DATABASES = {
         "NAME": config("POSTGRES_DB"),
         "USER": config("POSTGRES_USER"),
         "PASSWORD": config("POSTGRES_PASSWORD"),
-        "HOST": config("POSTGRES_HOST", default="db"), # Twoje istniejące ustawienie
-        "PORT": config("POSTGRES_PORT", default="5432"), # Twoje istniejące ustawienie
+        "HOST": config("POSTGRES_HOST", default="db"),  # Twoje istniejące ustawienie
+        "PORT": config("POSTGRES_PORT", default="5432"),  # Twoje istniejące ustawienie
     }
 }
 
@@ -124,8 +129,8 @@ REST_FRAMEWORK = {
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = "pl-pl" # Zmieniono dla PayU
-TIME_ZONE = "Europe/Warsaw" # Zmieniono dla PayU
+LANGUAGE_CODE = "pl-pl"  # Zmieniono dla PayU
+TIME_ZONE = "Europe/Warsaw"  # Zmieniono dla PayU
 
 USE_I18N = True
 USE_TZ = True
@@ -142,15 +147,21 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ORIGIN_ALLOW_ALL = True # Twoje istniejące ustawienie
-CORS_ALLOW_CREDENTIALS = True # Twoje istniejące ustawienie
+CORS_ORIGIN_ALLOW_ALL = True  # Twoje istniejące ustawienie
+CORS_ALLOW_CREDENTIALS = True  # Twoje istniejące ustawienie
 
-ACCESS_TOKEN_EXPIRATION_TIME_HOURS = config("ACCESS_TOKEN_EXPIRATION_TIME_HOURS", default=1, cast=int) # Twoje istniejące ustawienie
-REFRESH_TOKEN_EXPIRATION_TIME_DAYS = config("REFRESH_TOKEN_EXPIRATION_TIME_DAYS", default=7, cast=int) # Twoje istniejące ustawienie
+ACCESS_TOKEN_EXPIRATION_TIME_HOURS = config(
+    "ACCESS_TOKEN_EXPIRATION_TIME_HOURS", default=1, cast=int
+)  # Twoje istniejące ustawienie
+REFRESH_TOKEN_EXPIRATION_TIME_DAYS = config(
+    "REFRESH_TOKEN_EXPIRATION_TIME_DAYS", default=7, cast=int
+)  # Twoje istniejące ustawienie
 
 
 # Email
-EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend") # Twoje istniejące ustawienie
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
+)  # Twoje istniejące ustawienie
 EMAIL_HOST = config("EMAIL_HOST")
 EMAIL_PORT = config("EMAIL_PORT", cast=int)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER")
@@ -160,30 +171,51 @@ EMAIL_USE_SSL = config("EMAIL_USE_SSL", cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
 
-BASE_URL = config("BASE_URL", default="http://127.0.0.1:8000") # Twoje istniejące ustawienie
+BASE_URL = config(
+    "BASE_URL", default="http://127.0.0.1:8000"
+)  # Twoje istniejące ustawienie
 
 # MinIO
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage" # Twoje istniejące ustawienie
+DEFAULT_FILE_STORAGE = (
+    "storages.backends.s3boto3.S3Boto3Storage"  # Twoje istniejące ustawienie
+)
 AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY")
-AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME", default="audio-files") # Twoje istniejące ustawienie
-AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default="http://minio:9000") # Twoje istniejące ustawienie
-AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="eu-central-1") # Twoje istniejące ustawienie
-AWS_S3_ADDRESSING_STYLE = config("AWS_S3_ADDRESSING_STYLE", default="path") # Twoje istniejące ustawienie
-AWS_QUERYSTRING_AUTH = config("AWS_QUERYSTRING_AUTH", default=False, cast=bool) # Twoje istniejące ustawienie
-AWS_S3_FILE_OVERWRITE = config("AWS_S3_FILE_OVERWRITE", default=False, cast=bool) # Twoje istniejące ustawienie
-AWS_DEFAULT_ACL = config("AWS_DEFAULT_ACL", default=None) # Twoje istniejące ustawienie
-AWS_S3_CUSTOM_DOMAIN = config("AWS_S3_CUSTOM_DOMAIN", default=f"{AWS_S3_ENDPOINT_URL.split('//')[-1]}/{AWS_STORAGE_BUCKET_NAME}") # Twoje istniejące ustawienie
+AWS_STORAGE_BUCKET_NAME = config(
+    "AWS_STORAGE_BUCKET_NAME", default="audio-files"
+)  # Twoje istniejące ustawienie
+AWS_S3_ENDPOINT_URL = config(
+    "AWS_S3_ENDPOINT_URL", default="http://minio:9000"
+)  # Twoje istniejące ustawienie
+AWS_S3_REGION_NAME = config(
+    "AWS_S3_REGION_NAME", default="eu-central-1"
+)  # Twoje istniejące ustawienie
+AWS_S3_ADDRESSING_STYLE = config(
+    "AWS_S3_ADDRESSING_STYLE", default="path"
+)  # Twoje istniejące ustawienie
+AWS_QUERYSTRING_AUTH = config(
+    "AWS_QUERYSTRING_AUTH", default=False, cast=bool
+)  # Twoje istniejące ustawienie
+AWS_S3_FILE_OVERWRITE = config(
+    "AWS_S3_FILE_OVERWRITE", default=False, cast=bool
+)  # Twoje istniejące ustawienie
+AWS_DEFAULT_ACL = config("AWS_DEFAULT_ACL", default=None)  # Twoje istniejące ustawienie
+AWS_S3_CUSTOM_DOMAIN = config(
+    "AWS_S3_CUSTOM_DOMAIN",
+    default=f"{AWS_S3_ENDPOINT_URL.split('//')[-1]}/{AWS_STORAGE_BUCKET_NAME}",
+)  # Twoje istniejące ustawienie
 
 
-AUDIO_FILE_BASE_URL = config("AUDIO_FILE_BASE_URL", default=f"{AWS_S3_CUSTOM_DOMAIN}/") # Twoje istniejące ustawienie
+AUDIO_FILE_BASE_URL = config(
+    "AUDIO_FILE_BASE_URL", default=f"{AWS_S3_CUSTOM_DOMAIN}/"
+)  # Twoje istniejące ustawienie
 
 # DODAJ PONIŻSZE NOWE SEKCJE NA KOŃCU PLIKU settings.py
 
 # =============================================================================
 # PAYU SETTINGS
 # =============================================================================
-PAYU_SANDBOX_MODE = config('PAYU_SANDBOX_MODE', default=True, cast=bool)
+PAYU_SANDBOX_MODE = config("PAYU_SANDBOX_MODE", default=True, cast=bool)
 
 # Używa BASE_URL z .env do konstruowania URLi zwrotnych PayU.
 # Upewnij się, że BASE_URL w .env to publicznie dostępny URL Twojej aplikacji Django
@@ -191,30 +223,58 @@ PAYU_SANDBOX_MODE = config('PAYU_SANDBOX_MODE', default=True, cast=bool)
 YOUR_APP_BASE_URL = BASE_URL
 
 if PAYU_SANDBOX_MODE:
-    PAYU_OAUTH_URL = config('PAYU_OAUTH_URL_SANDBOX', default="https://secure.snd.payu.com/pl/standard/user/oauth/authorize")
-    PAYU_API_ORDER_URL = config('PAYU_API_ORDER_URL_SANDBOX', default="https://secure.snd.payu.com/api/v2_1/orders")
-    PAYU_MERCHANT_POS_ID = config('PAYU_POS_ID_SANDBOX') # Wymagane w .env
-    PAYU_OAUTH_CLIENT_ID = config('PAYU_OAUTH_CLIENT_ID_SANDBOX', default=PAYU_MERCHANT_POS_ID)
-    PAYU_OAUTH_CLIENT_SECRET = config('PAYU_OAUTH_CLIENT_SECRET_SANDBOX') # Wymagane w .env
-    PAYU_SIGNATURE_KEY = config('PAYU_SIGNATURE_KEY_SANDBOX') # Wymagane w .env (to jest drugi klucz MD5)
+    PAYU_OAUTH_URL = config(
+        "PAYU_OAUTH_URL_SANDBOX",
+        default="https://secure.snd.payu.com/pl/standard/user/oauth/authorize",
+    )
+    PAYU_API_ORDER_URL = config(
+        "PAYU_API_ORDER_URL_SANDBOX",
+        default="https://secure.snd.payu.com/api/v2_1/orders",
+    )
+    PAYU_MERCHANT_POS_ID = config("PAYU_POS_ID_SANDBOX")  # Wymagane w .env
+    PAYU_OAUTH_CLIENT_ID = config(
+        "PAYU_OAUTH_CLIENT_ID_SANDBOX", default=PAYU_MERCHANT_POS_ID
+    )
+    PAYU_OAUTH_CLIENT_SECRET = config(
+        "PAYU_OAUTH_CLIENT_SECRET_SANDBOX"
+    )  # Wymagane w .env
+    PAYU_SIGNATURE_KEY = config(
+        "PAYU_SIGNATURE_KEY_SANDBOX"
+    )  # Wymagane w .env (to jest drugi klucz MD5)
 else:
     # Ustawienia produkcyjne
-    PAYU_OAUTH_URL = config('PAYU_OAUTH_URL_PRODUCTION', default="https://secure.payu.com/pl/standard/user/oauth/authorize")
-    PAYU_API_ORDER_URL = config('PAYU_API_ORDER_URL_PRODUCTION', default="https://secure.payu.com/api/v2_1/orders")
-    PAYU_MERCHANT_POS_ID = config('PAYU_POS_ID_PRODUCTION') # Wymagane w .env dla produkcji
-    PAYU_OAUTH_CLIENT_ID = config('PAYU_OAUTH_CLIENT_ID_PRODUCTION', default=PAYU_MERCHANT_POS_ID)
-    PAYU_OAUTH_CLIENT_SECRET = config('PAYU_OAUTH_CLIENT_SECRET_PRODUCTION') # Wymagane w .env dla produkcji
-    PAYU_SIGNATURE_KEY = config('PAYU_SIGNATURE_KEY_PRODUCTION') # Wymagane w .env dla produkcji
+    PAYU_OAUTH_URL = config(
+        "PAYU_OAUTH_URL_PRODUCTION",
+        default="https://secure.payu.com/pl/standard/user/oauth/authorize",
+    )
+    PAYU_API_ORDER_URL = config(
+        "PAYU_API_ORDER_URL_PRODUCTION",
+        default="https://secure.payu.com/api/v2_1/orders",
+    )
+    PAYU_MERCHANT_POS_ID = config(
+        "PAYU_POS_ID_PRODUCTION"
+    )  # Wymagane w .env dla produkcji
+    PAYU_OAUTH_CLIENT_ID = config(
+        "PAYU_OAUTH_CLIENT_ID_PRODUCTION", default=PAYU_MERCHANT_POS_ID
+    )
+    PAYU_OAUTH_CLIENT_SECRET = config(
+        "PAYU_OAUTH_CLIENT_SECRET_PRODUCTION"
+    )  # Wymagane w .env dla produkcji
+    PAYU_SIGNATURE_KEY = config(
+        "PAYU_SIGNATURE_KEY_PRODUCTION"
+    )  # Wymagane w .env dla produkcji
 
 # Sprawdzenie, czy wymagane zmienne PayU są załadowane.
 # `config()` rzuci błędem `MissingValueError` jeśli zmienna bez wartości domyślnej nie zostanie znaleziona.
 try:
     _ = PAYU_MERCHANT_POS_ID
-    _ = PAYU_OAUTH_CLIENT_ID # Chociaż ma default, POS_ID jest wymagany
+    _ = PAYU_OAUTH_CLIENT_ID  # Chociaż ma default, POS_ID jest wymagany
     _ = PAYU_OAUTH_CLIENT_SECRET
     _ = PAYU_SIGNATURE_KEY
 except Exception as e:
-    print(f"KRYTYCZNE OSTRZEŻENIE: Brakujące ustawienia PayU w pliku .env lub zmiennych środowiskowych: {e}. Aplikacja może nie działać poprawnie z PayU.")
+    print(
+        f"KRYTYCZNE OSTRZEŻENIE: Brakujące ustawienia PayU w pliku .env lub zmiennych środowiskowych: {e}. Aplikacja może nie działać poprawnie z PayU."
+    )
     # W środowisku produkcyjnym rozważ rzucenie wyjątku, aby zatrzymać start aplikacji:
     # from django.core.exceptions import ImproperlyConfigured
     # raise ImproperlyConfigured(f"KRYTYCZNE: Brakujące ustawienia PayU: {e}")
@@ -229,9 +289,14 @@ except Exception as e:
 # 2. Ustaw DJANGO_CACHE_LOCATION na URL Twojego Redisa (np. 'redis://nazwa_serwisu_redis_w_docker:6379/0')
 # 3. Upewnij się, że masz zainstalowane `django-redis` (pip install django-redis)
 CACHES = {
-    'default': {
-        'BACKEND': config('DJANGO_CACHE_BACKEND', default='django.core.cache.backends.locmem.LocMemCache'),
-        'LOCATION': config('DJANGO_CACHE_LOCATION', default='django-payments-unique-cache'), # Dla locmem, unikalna nazwa
+    "default": {
+        "BACKEND": config(
+            "DJANGO_CACHE_BACKEND",
+            default="django.core.cache.backends.locmem.LocMemCache",
+        ),
+        "LOCATION": config(
+            "DJANGO_CACHE_LOCATION", default="django-payments-unique-cache"
+        ),  # Dla locmem, unikalna nazwa
         # 'OPTIONS': { # Przykład dla django-redis, jeśli potrzebne
         #     'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         # }

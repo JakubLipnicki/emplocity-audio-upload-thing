@@ -11,7 +11,6 @@ from .views import (
     TagListView,
     TopRatedAudioFilesView,
     UserLikedAudioFilesView,
-    TopRatedAudioFilesView,
 )
 
 urlpatterns = [
