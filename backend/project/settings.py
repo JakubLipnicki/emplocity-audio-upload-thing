@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     "storages",
     "accounts",
     "audio",
-    "payments", # <--- DODANO APLIKACJĘ PAYMENTS
+    "payments",  # Dodano w jednej gałęzi
+    "comments",  # Dodano w drugiej gałęzi
 ]
 AUTH_USER_MODEL = "accounts.User" # Twoje istniejące ustawienie
 

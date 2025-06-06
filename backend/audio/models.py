@@ -62,6 +62,8 @@ class AudioFile(models.Model):
     is_public = models.BooleanField(default=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     tags = models.ManyToManyField(Tag, related_name="audio_files", blank=True)
+    views = models.PositiveIntegerField(default=0)
+
 
     # --- NOWE POLE ---
     s3_metadata_set = models.BooleanField(default=False,

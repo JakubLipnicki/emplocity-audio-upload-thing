@@ -23,6 +23,8 @@ class AudioFileSerializer(serializers.ModelSerializer):
     )
     likes_count = serializers.SerializerMethodField()
     dislikes_count = serializers.SerializerMethodField()
+    uploader = serializers.SerializerMethodField()
+    views = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = AudioFile
@@ -37,6 +39,8 @@ class AudioFileSerializer(serializers.ModelSerializer):
             "likes_count",
             "dislikes_count",
             "tags",
+            "uploader",
+            "views",
         ]
 
     def create(self, validated_data):
@@ -52,6 +56,9 @@ class AudioFileSerializer(serializers.ModelSerializer):
 
     def get_dislikes_count(self, obj):
         return obj.likes.filter(is_liked=False).count()
+
+    def get_uploader(self, obj):
+        return obj.user.username if obj.user else "Anonim"
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
