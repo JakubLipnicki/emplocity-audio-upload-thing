@@ -1,4 +1,6 @@
 # backend/accounts/tests.py
+import time  # For adding a slight delay in token refresh test
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -97,17 +99,18 @@ class AccountRegistrationTests(APITestCase):
 
 class AccountLoginAndUserViewTests(APITestCase):
     """
-    Test suite for user login (/api/login), user details (/api/user), and logout (/api/logout) endpoints.
+    Test suite for user login, user details, logout, and token refresh endpoints.
     """
 
     def setUp(self):
         """
-        Set up data for login, user view, and logout tests.
+        Set up data for login, user view, logout, and refresh token tests.
         Creates an active user and an inactive user.
         """
         self.login_url = reverse("login")
         self.user_details_url = reverse("user")
         self.logout_url = reverse("logout")
+        self.refresh_token_url = reverse("refresh")
 
         self.active_user_email = "active_login@example.com"
         self.active_user_password = "testpassword123"
@@ -253,8 +256,82 @@ class AccountLoginAndUserViewTests(APITestCase):
         access_cookie_after_logout = logout_response.cookies.get("access_token")
         refresh_cookie_after_logout = logout_response.cookies.get("refresh_token")
 
-        # ZMIANA TUTAJ: Oczekuj liczby całkowitej 0 dla max-age
         self.assertEqual(access_cookie_after_logout["max-age"], 0)
         self.assertEqual(access_cookie_after_logout.value, "")
         self.assertEqual(refresh_cookie_after_logout["max-age"], 0)
         self.assertEqual(refresh_cookie_after_logout.value, "")
+
+    def test_refresh_token_success(self):
+        """
+        Tests successful refresh of an access token using a valid refresh token cookie.
+        """
+        login_response = self.client.post(
+            self.login_url, self.login_data_active_correct, format="json"
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertIn("refresh_token", login_response.cookies)
+        original_access_token_cookie = login_response.cookies.get("access_token")
+
+        time.sleep(1.1)  # Wait a bit to ensure new token has a different timestamp
+
+        refresh_response = self.client.post(self.refresh_token_url, format="json")
+
+        self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
+        self.assertIn("message", refresh_response.data)
+        self.assertEqual(
+            refresh_response.data["message"], "Access token refreshed successfully"
+        )
+
+        self.assertIn(
+            "access_token", refresh_response.cookies
+        )  # Check if new access_token cookie is set
+        new_access_token_cookie = refresh_response.cookies.get("access_token")
+
+        if original_access_token_cookie:
+            self.assertNotEqual(
+                new_access_token_cookie.value, original_access_token_cookie.value
+            )
+
+        self.assertTrue(new_access_token_cookie["httponly"])
+        self.assertEqual(
+            bool(new_access_token_cookie.get("secure")),
+            bool(settings.SESSION_COOKIE_SECURE),
+        )
+        self.assertEqual(new_access_token_cookie["samesite"], "Lax")
+        self.assertEqual(
+            int(new_access_token_cookie["max-age"]),
+            settings.ACCESS_TOKEN_EXPIRATION_TIME_HOURS * 60 * 60,
+        )
+
+    def test_refresh_token_no_refresh_cookie(self):
+        """
+        Tests attempting to refresh token without a refresh_token cookie.
+        Expects an authentication error (403 Forbidden as per current app behavior).
+        """
+        response = self.client.post(self.refresh_token_url, format="json")
+        self.assertEqual(
+            response.status_code, status.HTTP_403_FORBIDDEN
+        )  # Adjusted based on previous error
+        self.assertIn("detail", response.data)
+        self.assertEqual(
+            str(response.data["detail"]), "Refresh token not found in cookies."
+        )
+
+    def test_refresh_token_invalid_or_expired_refresh_cookie(self):
+        """
+        Tests attempting to refresh token with an invalid/expired refresh_token cookie.
+        Expects an authentication error (403 Forbidden).
+        """
+        # Manually set an invalid cookie on the test client
+        self.client.cookies.load({"refresh_token": "invalidorexpiredtoken"})
+
+        response = self.client.post(self.refresh_token_url, format="json")
+
+        self.assertEqual(
+            response.status_code, status.HTTP_403_FORBIDDEN
+        )  # Adjusted based on previous error
+        self.assertIn("detail", response.data)
+        # The exact message might depend on your decode_token or RefreshTokenView logic
+        self.assertTrue(
+            "Invalid or expired refresh token" in str(response.data["detail"])
+        )

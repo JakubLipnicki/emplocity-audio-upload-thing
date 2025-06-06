@@ -4,10 +4,8 @@ from django.core.mail import send_mail
 from django.shortcuts import redirect
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import (
-    AllowAny,  # Dodano IsAuthenticated
-    IsAuthenticated,
-)
+from rest_framework.permissions import AllowAny  # Dodano IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
