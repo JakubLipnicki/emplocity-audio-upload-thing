@@ -8,7 +8,8 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
 from django.conf import settings
-from django.shortcuts import render  # Added for rendering HTML templates
+from django.shortcuts import render
+from django.contrib.auth import get_user_model  # Potrzebne do pobrania modelu User
 
 from .models import PaymentOrder
 from .payu_service import create_payu_order_api_call
@@ -20,7 +21,7 @@ def initiate_payment_view(request):
     """
     API view to initiate a payment with PayU.
     Expects JSON: {'amount': (int, grosze), 'description': (str)}
-    User must be authenticated.
+    !!! AUTORYZACJA TYMCZASOWO WYŁĄCZONA DLA CELÓW TESTOWYCH PAYU !!!
     """
     try:
         data = json.loads(request.body.decode('utf-8'))
@@ -32,16 +33,35 @@ def initiate_payment_view(request):
         if not description:
             return JsonResponse({'error': 'Description is required.'}, status=400)
 
-        current_user = request.user
-        if not current_user.is_authenticated:
-            return JsonResponse({'error': 'User authentication required.'}, status=401)
+        # --- TYMCZASOWE WYŁĄCZENIE SPRAWDZANIA AUTORYZACJI ---
+        # current_user = request.user
+        # if not current_user.is_authenticated:
+        #     return JsonResponse({'error': 'User authentication required.'}, status=401)
+        # --- KONIEC TYMCZASOWEGO WYŁĄCZENIA ---
+
+        # --- TYMCZASOWE USTAWIENIE UŻYTKOWNIKA DLA TESTÓW ---
+        # ZASTĄP "twoj_istniejacy_email_testowy@example.com" RZECZYWISTYM EMAILEM
+        # UŻYTKOWNIKA TESTOWEGO Z TWOJEJ BAZY DANYCH.
+        # TEN UŻYTKOWNIK MUSI ISTNIEĆ.
+        User = get_user_model()
+        try:
+            # ZMIEŃ PONIŻSZY EMAIL NA EMAIL ISTNIEJĄCEGO UŻYTKOWNIKA W TWOJEJ BAZIE
+            current_user = User.objects.get(email="emplocity.project@gmail.com")
+        except User.DoesNotExist:
+            print(
+                "PAYMENTS_VIEW_CRITICAL: Test user with specified email not found for payment initiation when auth is bypassed. Payment cannot be linked to a user.")
+            return JsonResponse({
+                                    'error': 'Critical Test Setup Error: Test user not found. Please configure a valid test user email in payments/views.py or fix authentication.'},
+                                status=500)
+        except Exception as e_user_fetch:
+            print(f"PAYMENTS_VIEW_CRITICAL: Error fetching test user: {e_user_fetch}")
+            return JsonResponse({'error': 'Critical Test Setup Error: Could not fetch test user.'}, status=500)
+        # --- KONIEC TYMCZASOWEGO USTAWIENIA UŻYTKOWNIKA ---
 
     except (json.JSONDecodeError, TypeError, ValueError) as e:
         print(f"PAYMENTS_VIEW_ERROR: Invalid JSON/data in initiate_payment_view: {str(e)}")
         return JsonResponse({'error': f'Invalid JSON payload or data type: {str(e)}'}, status=400)
-    except AttributeError:
-        print(f"PAYMENTS_VIEW_ERROR: User context missing in initiate_payment_view.")
-        return JsonResponse({'error': 'User context not available.'}, status=500)
+    # Usunięto `except AttributeError` dla `request.user`, bo teraz `current_user` jest ustawiany inaczej
 
     user_display_name = getattr(current_user, 'name', "")
     user_first_name = getattr(current_user, 'first_name', "")
@@ -56,7 +76,7 @@ def initiate_payment_view(request):
 
     try:
         order = PaymentOrder.objects.create(
-            user=current_user,
+            user=current_user,  # Teraz używamy ręcznie pobranego użytkownika
             amount=amount,
             description=description,
             currency='PLN',
@@ -137,10 +157,8 @@ def initiate_payment_view(request):
 @csrf_exempt
 @require_POST
 def payu_notification_receiver_view(request):
-    """
-    Handles incoming Instant Payment Notifications (IPN) from PayU.
-    Verifies signature and updates PaymentOrder status.
-    """
+    # ... (kod tego widoku pozostaje taki sam jak w poprzedniej pełnej wersji) ...
+    # ... (cała logika weryfikacji podpisu, aktualizacji statusu i logiki biznesowej) ...
     print("PAYMENTS_VIEW_INFO: Received a notification from PayU.")
     raw_notification_body = request.body
     signature_header = request.headers.get('OpenPayU-Signature')
@@ -224,14 +242,28 @@ def payu_notification_receiver_view(request):
     if payu_status == 'COMPLETED':
         order_to_update.status = PaymentOrder.Status.COMPLETED
         print(f"PAYMENTS_VIEW_INFO: Order {order_to_update.ext_order_id} status set to COMPLETED.")
-        # === ADD YOUR BUSINESS LOGIC FOR COMPLETED PAYMENT HERE ===
-        # E.g., grant access to purchased item (profile frame), send confirmation email, etc.
-        # if order_to_update.user:
-        #     print(f"Granting access/item to user {order_to_update.user.email} for order {order_to_update.ext_order_id}")
-        #     # Example: user_profile = order_to_update.user.profile
-        #     # user_profile.activate_frame(order_to_update.description) # Assuming 'description' holds frame ID/name
-        #     # user_profile.save()
-        # =========================================================
+
+        if order_to_update.user:
+            user_to_update = order_to_update.user
+            purchased_item_description = order_to_update.description
+            print(
+                f"  Processing COMPLETED payment for user: {user_to_update.email}, item: '{purchased_item_description}'")
+            if hasattr(user_to_update, 'active_profile_frame_name'):
+                try:
+                    user_to_update.active_profile_frame_name = purchased_item_description
+                    user_to_update.save(update_fields=['active_profile_frame_name'])
+                    print(
+                        f"  SUCCESS: User {user_to_update.email} profile updated with frame: '{purchased_item_description}'.")
+                except Exception as e_user_update:
+                    print(
+                        f"  ERROR: Could not update user profile for {user_to_update.email} with frame. Error: {e_user_update}")
+            else:
+                print(
+                    f"  WARNING: User model for {user_to_update.email} does not have 'active_profile_frame_name' attribute.")
+        else:
+            print(
+                f"  WARNING: PaymentOrder {order_to_update.ext_order_id} is COMPLETED but has no associated user to update.")
+
     elif payu_status == 'CANCELED':
         order_to_update.status = PaymentOrder.Status.CANCELED
         print(f"PAYMENTS_VIEW_INFO: Order {order_to_update.ext_order_id} status set to CANCELED.")
@@ -240,20 +272,23 @@ def payu_notification_receiver_view(request):
             order_to_update.status = PaymentOrder.Status.PROCESSING
         print(f"PAYMENTS_VIEW_INFO: Order {order_to_update.ext_order_id} status is PROCESSING (PayU: {payu_status}).")
     else:
-        print(f"PAYMENTS_VIEW_WARNING: Unmapped PayU status '{payu_status}' for order {order_to_update.ext_order_id}.")
+        print(
+            f"PAYMENTS_VIEW_WARNING: Unmapped PayU status '{payu_status}' for order {order_to_update.ext_order_id}. Considering it FAILED if not already finalized.")
         if order_to_update.status not in [PaymentOrder.Status.COMPLETED, PaymentOrder.Status.CANCELED]:
             order_to_update.status = PaymentOrder.Status.FAILED
 
     if not order_to_update.payu_order_id and payu_order_id:
         order_to_update.payu_order_id = payu_order_id
 
-    if previous_status != order_to_update.status or (
-            not order_to_update.payu_order_id and payu_order_id):  # Check if payu_order_id was newly added
+    if previous_status != order_to_update.status or \
+            (
+                    order_to_update.payu_order_id is None and payu_order_id is not None and order_to_update.payu_order_id != payu_order_id):
         order_to_update.save()
         print(
             f"PAYMENTS_VIEW_INFO: Saved changes for order {order_to_update.ext_order_id}. New status: {order_to_update.status}")
     else:
-        print(f"PAYMENTS_VIEW_INFO: No status/PayU ID change for order {order_to_update.ext_order_id}. No save needed.")
+        print(
+            f"PAYMENTS_VIEW_INFO: No status/PayU ID change requiring save for order {order_to_update.ext_order_id}. Current status: {order_to_update.status}")
 
     return HttpResponse("Notification processed.", status=200)
 
@@ -266,17 +301,11 @@ def payment_finish_page_view(request):
     Displays a status message to the user.
     """
     payu_error_code = request.GET.get('error')
-    # You might also receive 'extOrderId' or your internal order ID as a query parameter
-    # if you construct your `continueUrl` to include it when initiating the payment.
-    # This would allow you to fetch the specific order and display more details.
-    # For example, if you passed `&order_id={{ order.id }}` in continueUrl payload.
-    # internal_order_id = request.GET.get('order_id')
-
     context = {
         'page_title': "Status Płatności",
         'message': "Dziękujemy! Twoja płatność jest przetwarzana. Otrzymasz potwierdzenie o jej statusie niebawem.",
         'is_error': False,
-        # 'order': None # You could pass the order object to the template if fetched.
+        'FRONTEND_URL': settings.FRONTEND_URL
     }
 
     if payu_error_code:
@@ -284,22 +313,7 @@ def payment_finish_page_view(request):
             'message'] = f"Wystąpił błąd podczas procesu płatności po stronie PayU (kod błędu: {payu_error_code}). Jeśli środki zostały pobrane, prosimy o kontakt z obsługą."
         context['is_error'] = True
         print(f"PAYMENTS_VIEW_INFO: User redirected to finish page with PayU error code: {payu_error_code}")
-    # elif internal_order_id:
-    #     try:
-    #         order = PaymentOrder.objects.get(id=internal_order_id, user=request.user if request.user.is_authenticated else None)
-    #         context['order'] = order
-    #         if order.status == PaymentOrder.Status.COMPLETED:
-    #             context['message'] = "Twoja płatność została pomyślnie zakończona! Dziękujemy za zakup."
-    #         elif order.status == PaymentOrder.Status.CANCELED:
-    #             context['message'] = "Twoja płatność została anulowana."
-    #             context['is_error'] = True # Or a different flag for canceled
-    #         # Other statuses will show the default "processing" message.
-    #     except PaymentOrder.DoesNotExist:
-    #         print(f"PAYMENTS_VIEW_WARNING: User redirected to finish page, but order with ID {internal_order_id} not found or doesn't belong to user.")
-    #         context['message'] = "Nie można odnaleźć informacji o Twoim zamówieniu. Skontaktuj się z obsługą, jeśli płatność została dokonana."
-    #         context['is_error'] = True # Treat as an issue for the user.
     else:
         print(f"PAYMENTS_VIEW_INFO: User redirected to finish page. No immediate PayU error in URL.")
 
-    # Render an HTML template.
-    return render(request, 'payments/payment_finish.html', context)
+    return render(request, 'payments/payments/payment_finish.html', context)

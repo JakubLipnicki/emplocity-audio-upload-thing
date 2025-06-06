@@ -3,34 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ page_title|default:"Status Płatności" }}</title>
+    <title>{{ page_title|default:"Status Płatności" }} - TwojaAplikacja</title> {# Możesz dodać nazwę swojej aplikacji #}
     <style>
-        body { font-family: sans-serif; margin: 20px; padding: 0; background-color: #f4f4f4; color: #333; text-align: center; }
-        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); display: inline-block; }
-        h1 { color: #333; }
-        p { font-size: 1.1em; }
-        .error-message { color: #d9534f; font-weight: bold; }
-        .success-message { color: #5cb85c; } /* Not used directly now, but for future */
-        a { color: #007bff; text-decoration: none; margin-top: 20px; display: inline-block; }
-        a:hover { text-decoration: underline; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f7f7f7;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 90vh;
+            justify-content: center;
+        }
+        .container {
+            background-color: #fff;
+            padding: 25px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        p {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+        .message-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        .success .message-icon { color: #2ecc71; }
+        .error .message-icon { color: #e74c3c; }
+        .processing .message-icon { color: #3498db; }
+
+        .error-message { color: #e74c3c; font-weight: 500; }
+        .info-message { color: #3498db; }
+
+        .button-link {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 20px;
+            background-color: #3498db;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        .button-link:hover {
+            background-color: #2980b9;
+        }
+        .footer-note {
+            margin-top: 30px;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>{{ page_title|default:"Status Płatności" }}</h1>
-
+    <div class="container {% if is_error %}error{% elif order.status == 'COMPLETED' %}success{% else %}processing{% endif %}">
         {% if is_error %}
-            <p class="error-message">{{ message }}</p>
+            <div class="message-icon">⚠️</div> {# lub odpowiednia ikona błędu #}
+        {% elif order and order.status == 'COMPLETED' %}
+            <div class="message-icon">✔️</div> {# lub odpowiednia ikona sukcesu #}
         {% else %}
-            <p>{{ message }}</p>
+            <div class="message-icon">⏳</div> {# lub odpowiednia ikona przetwarzania #}
         {% endif %}
 
-        <p><a href="/">Wróć na stronę główną</a></p>
-        <!--
-            W bardziej zaawansowanej wersji, możesz chcieć tutaj dodać link do
-            historii zamówień użytkownika lub próbować odświeżyć status zamówienia
-            za pomocą JavaScript, odpytując Twój backend.
-        -->
+        <h1>{{ page_title|default:"Status Płatności" }}</h1>
+
+        <p class="{% if is_error %}error-message{% elif order and order.status == 'COMPLETED' %}success-message{% else %}info-message{% endif %}">
+            {{ message }}
+        </p>
+
+        {% if order %}
+            <p><strong>ID Twojego zamówienia:</strong> {{ order.ext_order_id }}</p>
+            <p><strong>Status:</strong> {{ order.get_status_display }}</p> {# Zakładając, że PaymentOrder.Status ma `label` #}
+        {% endif %}
+
+        <a href="{{ FRONTEND_URL|default:'/' }}" class="button-link">Wróć do serwisu</a>
+
+        <p class="footer-note">
+            Jeśli masz jakiekolwiek pytania dotyczące swojego zamówienia, skontaktuj się z naszą obsługą klienta.
+        </p>
     </div>
 </body>
 </html>
