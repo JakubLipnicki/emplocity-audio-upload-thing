@@ -11,10 +11,15 @@ from rest_framework.views import APIView
 
 from .models import User
 from .serializers import UserSerializer
-from .utils import (decode_password_reset_token, decode_token,
-                    decode_verification_token, generate_access_token,
-                    generate_password_reset_token, generate_refresh_token,
-                    generate_verification_token)
+from .utils import (
+    decode_password_reset_token,
+    decode_token,
+    decode_verification_token,
+    generate_access_token,
+    generate_password_reset_token,
+    generate_refresh_token,
+    generate_verification_token,
+)
 
 
 class RegisterView(APIView):

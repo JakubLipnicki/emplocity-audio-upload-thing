@@ -7,18 +7,19 @@ from botocore.client import Config  # Dla konfiguracji boto3
 from django.conf import settings  # Import ustawień Django
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.files.base import \
-    ContentFile  # Do zapisu flagi (choć użyjemy pola boolean)
+from django.core.files.base import (
+    ContentFile,
+)  # Do zapisu flagi (choć użyjemy pola boolean)
 from django.db import models
 from django.db.models.signals import post_save  # Import dla sygnałów
 from django.dispatch import receiver  # Import dla dekoratora receiver
 from storages.backends.s3boto3 import S3Boto3Storage
+
 # Zakładam, że value_object.py jest w głównym katalogu backendu lub jest dostępne w ścieżce Pythona
 # Jeśli jest w backend/ to: from value_object import ALLOWED_AUDIO_EXTENSIONS
 # Jeśli jest poziom wyżej: from ..value_object import ALLOWED_AUDIO_EXTENSIONS (może wymagać dostosowania importów)
 # Na razie załóżmy, że jest dostępne jako:
-from value_object import \
-    ALLOWED_AUDIO_EXTENSIONS  # DOSTOSUJ IMPORT, JEŚLI TRZEBA
+from value_object import ALLOWED_AUDIO_EXTENSIONS  # DOSTOSUJ IMPORT, JEŚLI TRZEBA
 
 User = get_user_model()
 
