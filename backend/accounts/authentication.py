@@ -1,11 +1,11 @@
 # backend/accounts/authentication.py
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import BaseAuthentication
-from rest_framework.exceptions import (
-    AuthenticationFailed,
-)  # Importuj AuthenticationFailed z DRF
+from rest_framework.exceptions import \
+    AuthenticationFailed  # Importuj AuthenticationFailed z DRF
 
-from .utils import decode_token  # Zakładam, że decode_token jest w accounts/utils.py
+from .utils import \
+    decode_token  # Zakładam, że decode_token jest w accounts/utils.py
 
 User = get_user_model()
 

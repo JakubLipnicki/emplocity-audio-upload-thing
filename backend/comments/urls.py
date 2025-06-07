@@ -1,10 +1,7 @@
 from django.urls import path
 
-from .views import (
-    CommentListCreateView,
-    CommentRetrieveUpdateDeleteView,
-    ReplyListCreateView,
-)
+from .views import (CommentListCreateView, CommentRetrieveUpdateDeleteView,
+                    ReplyListCreateView)
 
 urlpatterns = [
     path(

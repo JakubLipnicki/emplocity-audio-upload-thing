@@ -1,17 +1,10 @@
 from django.urls import path
 
-from .views import (
-    AddLikeView,
-    AudioFileDeleteView,
-    AudioFileDetailByUUIDView,
-    AudioFileLikesCountView,
-    AudioFilesByTagView,
-    AudioFileUploadView,
-    LatestAudioFilesView,
-    TagListView,
-    TopRatedAudioFilesView,
-    UserLikedAudioFilesView,
-)
+from .views import (AddLikeView, AudioFileDeleteView,
+                    AudioFileDetailByUUIDView, AudioFileLikesCountView,
+                    AudioFilesByTagView, AudioFileUploadView,
+                    LatestAudioFilesView, TagListView, TopRatedAudioFilesView,
+                    UserLikedAudioFilesView)
 
 urlpatterns = [
     path("upload/", AudioFileUploadView.as_view(), name="audio-upload"),
