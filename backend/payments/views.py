@@ -28,20 +28,11 @@ from .payu_service import create_payu_order_api_call
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def initiate_payment_view(request):
-    """
-    API view to initiate a payment with PayU using Django REST Framework decorators.
-    Expects JSON: {'amount': (int, grosze), 'description': (str)}
-    User MUST be authenticated (handled by @permission_classes).
-    """
-    current_user = (
-        request.user
-    )  # Dzięki dekoratorom, request.user jest już uwierzytelnionym użytkownikiem
-
+    current_user = request.user
     try:
         data = request.data
         amount_raw = data.get("amount")
         description = data.get("description")
-
         if amount_raw is None:
             return Response(
                 {"error": "Amount is required."}, status=status.HTTP_400_BAD_REQUEST
@@ -63,7 +54,6 @@ def initiate_payment_view(request):
                 {"error": "Description is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
     except Exception as e:
         print(
             f"PAYMENTS_VIEW_ERROR: Error processing request data in initiate_payment_view: {str(e)}"
@@ -83,7 +73,6 @@ def initiate_payment_view(request):
         final_first_name = name_parts[0]
         if len(name_parts) > 1:
             final_last_name = name_parts[1]
-
     try:
         order = PaymentOrder.objects.create(
             user=current_user,
@@ -104,7 +93,6 @@ def initiate_payment_view(request):
             {"error": "Internal server error: Could not create order record."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-
     try:
         notify_url_path = reverse("payments:payu_notify_callback")
         continue_url_path = reverse("payments:payment_finish_page")
@@ -121,7 +109,6 @@ def initiate_payment_view(request):
             {"error": "Internal server error: Callback URL configuration error."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     customer_ip = (
         x_forwarded_for.split(",")[0].strip()
@@ -133,7 +120,6 @@ def initiate_payment_view(request):
         print(
             "PAYMENTS_VIEW_WARNING: Customer IP not found. Using fallback '127.0.0.1'."
         )
-
     payu_payload = {
         "notifyUrl": notify_url,
         "continueUrl": continue_url,
@@ -153,9 +139,7 @@ def initiate_payment_view(request):
             {"name": order.description, "unitPrice": str(order.amount), "quantity": "1"}
         ],
     }
-
     payu_response_data = create_payu_order_api_call(payu_payload)
-
     if (
         not payu_response_data
         or "error" in payu_response_data
@@ -181,15 +165,12 @@ def initiate_payment_view(request):
             {"error": "Failed to initiate payment with PayU.", "details": error_detail},
             status=status.HTTP_502_BAD_GATEWAY,
         )
-
     order.payu_order_id = payu_response_data.get("orderId")
     order.redirect_uri_payu = payu_response_data.get("redirectUri")
     order.save()
-
     print(
         f"PAYMENTS_VIEW_INFO: Initiated payment with PayU. PayU Order ID: {order.payu_order_id}. User: {current_user.email}. Redirecting."
     )
-
     return Response(
         {
             "message": "Payment initiated. Redirecting to PayU...",
@@ -204,7 +185,6 @@ def initiate_payment_view(request):
 @csrf_exempt
 @require_POST
 def payu_notification_receiver_view(request):
-    # ... (kod tego widoku pozostaje taki sam jak w poprzedniej pełnej wersji) ...
     print("PAYMENTS_VIEW_INFO: Received a notification from PayU.")
     raw_notification_body = request.body
     signature_header = request.headers.get("OpenPayU-Signature")
@@ -348,7 +328,7 @@ def payu_notification_receiver_view(request):
         order_to_update.payu_order_id is None
         and payu_order_id is not None
         and order_to_update.payu_order_id != payu_order_id
-    ):  # Check if payu_order_id was newly added or changed
+    ):
         order_to_update.save()
         print(
             f"PAYMENTS_VIEW_INFO: Saved changes for order {order_to_update.ext_order_id}. New status: {order_to_update.status}"
@@ -385,4 +365,5 @@ def payment_finish_page_view(request):
         print(
             f"PAYMENTS_VIEW_INFO: User redirected to finish page. No immediate PayU error in URL."
         )
-    return render(request, "payments/payments/payment_finish.html", context)
+
+    return render(request, "payments/payment_finish.html", context)

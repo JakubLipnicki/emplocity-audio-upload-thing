@@ -11,26 +11,21 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import PaymentOrder  # Import z bieżącej aplikacji 'payments'
+from .models import PaymentOrder
 
-# User jest potrzebny, bo PaymentOrder ma do niego ForeignKey
-# i tworzymy użytkowników testowych dla scenariuszy płatności.
-User = get_user_model()  # Pobiera model User zdefiniowany w settings.AUTH_USER_MODEL
+User = get_user_model()
 
 
-# --- Funkcja pomocnicza do generowania podpisu PayU dla testów ---
 def generate_payu_signature(data_bytes, signature_key):
     concatenated = data_bytes + signature_key.encode("utf-8")
     return hashlib.sha256(concatenated).hexdigest()
 
 
 class PaymentInitiationTests(APITestCase):
+    # ... (kod tej klasy pozostaje bez zmian, jest poprawny) ...
     def setUp(self):
         self.initiate_payment_url = reverse("payments:initiate_payment_api")
-        self.login_url = reverse(
-            "login"
-        )  # Z accounts.urls, do logowania użytkownika w teście
-
+        self.login_url = reverse("login")
         self.test_user_email = "paymentuser_for_payments_app@example.com"
         self.test_user_password = "testpassword123"
         self.user = User.objects.create_user(
@@ -43,10 +38,9 @@ class PaymentInitiationTests(APITestCase):
             "email": self.test_user_email,
             "password": self.test_user_password,
         }
-
         self.valid_payload = {
             "amount": 1000,
-            "description": "Testowa Ramka Profilowa (z payments tests)",
+            "description": "Testowa Ramka Profilowa Premium (z payments tests)",
         }
         self.payload_missing_amount = {"description": "Test bez kwoty"}
         self.payload_invalid_amount_zero = {
@@ -175,6 +169,7 @@ class PaymentInitiationTests(APITestCase):
 
 
 class PaymentNotificationTests(APITestCase):
+    # ... (kod tej klasy pozostaje bez zmian) ...
     def setUp(self):
         self.notify_url = reverse("payments:payu_notify_callback")
         self.user = User.objects.create_user(
@@ -320,3 +315,46 @@ class PaymentNotificationTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("Order not found, acknowledged.", response.content.decode())
+
+
+# === NOWA KLASA TESTOWA PONIŻEJ ===
+
+
+class PaymentFinishViewTests(APITestCase):
+    def setUp(self):
+        self.finish_url = reverse("payments:payment_finish_page")
+
+    def test_payment_finish_page_loads_ok_no_error(self):
+        response = self.client.get(self.finish_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # ZMIANA OCZEKIWANEJ ŚCIEŻKI SZABLONU
+        self.assertTemplateUsed(response, "payments/payment_finish.html")
+        self.assertContains(response, "Status Płatności")
+        self.assertContains(response, "Twoja płatność jest przetwarzana")
+        self.assertNotContains(response, "Wystąpił błąd")
+
+    def test_payment_finish_page_with_payu_error_param(self):
+        error_code = "501"
+        response = self.client.get(f"{self.finish_url}?error={error_code}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # ZMIANA OCZEKIWANEJ ŚCIEŻKI SZABLONU
+        self.assertTemplateUsed(response, "payments/payment_finish.html")
+        self.assertContains(response, "Status Płatności")
+        self.assertContains(
+            response,
+            f"Wystąpił błąd podczas procesu płatności po stronie PayU (kod błędu: {error_code})",
+        )
+        self.assertNotContains(response, "Twoja płatność jest przetwarzana")
+
+    # test_payment_finish_page_context_data nie używa assertTemplateUsed, więc nie wymaga zmiany w tej kwestii
+    def test_payment_finish_page_context_data(self):
+        response = self.client.get(self.finish_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Ten test nie potrzebuje assertTemplateUsed, ale upewnij się, że widok renderuje poprawny szablon
+        self.assertEqual(response.context["page_title"], "Status Płatności")
+        self.assertFalse(response.context["is_error"])
+        self.assertEqual(response.context["FRONTEND_URL"], settings.FRONTEND_URL)
+
+        response_with_error = self.client.get(f"{self.finish_url}?error=some_error")
+        self.assertEqual(response_with_error.status_code, status.HTTP_200_OK)
+        self.assertTrue(response_with_error.context["is_error"])
