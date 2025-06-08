@@ -13,7 +13,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from .models import AudioFile, Like, Tag  # Dodano Like
+from .models import AudioFile, Like, Tag
 
 try:
     from value_object import ALLOWED_AUDIO_EXTENSIONS
@@ -440,14 +440,8 @@ class AudioFileDeleteViewTests(APITestCase):
         self.assertEqual(AudioFile.objects.count(), initial_count)
 
 
-# === NOWA KLASA TESTOWA PONIŻEJ ===
-
-
 class AddLikeViewTests(APITestCase):
-    """
-    Test suite for the AddLikeView endpoint (/api/audio/<uuid>/like/).
-    """
-
+    # ... (kod tej klasy pozostaje bez zmian) ...
     def setUp(self):
         self.login_url = reverse("login")
         self.user1 = User.objects.create_user(
@@ -463,10 +457,9 @@ class AddLikeViewTests(APITestCase):
             is_active=True,
         )
         self.user1_login_data = {"email": "liker1@example.com", "password": "password"}
-
         with patch("audio.models.set_s3_content_disposition_metadata"):
             self.audio_file = AudioFile.objects.create(
-                user=self.user2,  # Owned by user2
+                user=self.user2,
                 title="Likeable Audio",
                 file=create_dummy_file("likeable.mp3"),
                 is_public=True,
@@ -482,13 +475,10 @@ class AddLikeViewTests(APITestCase):
         self.client.post(self.login_url, self.user1_login_data, format="json")
 
     def test_add_like_success(self):
-        """Authenticated user can add a like to an audio file."""
         self._login_user1()
         payload = {"is_liked": True}
         response = self.client.post(self.like_url, payload, format="json")
-        self.assertEqual(
-            response.status_code, status.HTTP_200_OK
-        )  # Your view returns 200 OK on update/create
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["is_liked"])
         self.assertEqual(
             Like.objects.filter(
@@ -498,7 +488,6 @@ class AddLikeViewTests(APITestCase):
         )
 
     def test_add_dislike_success(self):
-        """Authenticated user can add a dislike to an audio file."""
         self._login_user1()
         payload = {"is_liked": False}
         response = self.client.post(self.like_url, payload, format="json")
@@ -512,9 +501,7 @@ class AddLikeViewTests(APITestCase):
         )
 
     def test_change_like_to_dislike(self):
-        """Authenticated user can change their like to a dislike."""
         self._login_user1()
-        # First, add a like
         Like.objects.create(user=self.user1, audio_file=self.audio_file, is_liked=True)
         self.assertEqual(
             Like.objects.filter(
@@ -522,8 +509,6 @@ class AddLikeViewTests(APITestCase):
             ).count(),
             1,
         )
-
-        # Then, change to dislike
         payload = {"is_liked": False}
         response = self.client.post(self.like_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -539,30 +524,309 @@ class AddLikeViewTests(APITestCase):
                 user=self.user1, audio_file=self.audio_file, is_liked=True
             ).count(),
             0,
-        )  # Old like should be gone
+        )
 
     def test_add_like_unauthenticated(self):
-        """Unauthenticated user cannot add a like. Expects 403."""
-        # Client is not logged in
         payload = {"is_liked": True}
         response = self.client.post(self.like_url, payload, format="json")
-        self.assertEqual(
-            response.status_code, status.HTTP_403_FORBIDDEN
-        )  # AddLikeView has IsAuthenticated
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_add_like_missing_is_liked_field(self):
-        """Attempting to like/dislike without providing 'is_liked' field. Expects 400."""
         self._login_user1()
-        payload = {}  # Missing 'is_liked'
+        payload = {}
         response = self.client.post(self.like_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("is_liked", response.data)  # ValidationError from AddLikeView
+        self.assertIn("is_liked", response.data)
 
     def test_add_like_non_existent_audio(self):
-        """Attempting to like/dislike a non-existent audio file. Expects 404."""
         self._login_user1()
         payload = {"is_liked": True}
         response = self.client.post(
             self.non_existent_audio_like_url, payload, format="json"
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class UserLikedAudioFilesViewTests(APITestCase):
+    # ... (kod tej klasy pozostaje bez zmian) ...
+    def setUp(self):
+        self.login_url = reverse("login")
+        self.liked_audio_url = reverse("audio:user-liked-audio")
+        self.user1 = User.objects.create_user(
+            email="user1_likes@example.com",
+            password="password",
+            name="User One Likes",
+            is_active=True,
+        )
+        self.user1_login_data = {
+            "email": "user1_likes@example.com",
+            "password": "password",
+        }
+        self.user2 = User.objects.create_user(
+            email="user2_nolikes@example.com",
+            password="password",
+            name="User Two NoLikes",
+            is_active=True,
+        )
+        with patch("audio.models.set_s3_content_disposition_metadata"):
+            self.audio1 = AudioFile.objects.create(
+                user=self.user2,
+                title="Liked Audio 1",
+                file=create_dummy_file("liked1.mp3"),
+                is_public=True,
+            )
+            self.audio2 = AudioFile.objects.create(
+                user=self.user2,
+                title="Liked Audio 2",
+                file=create_dummy_file("liked2.mp3"),
+                is_public=True,
+            )
+            self.audio3_not_liked = AudioFile.objects.create(
+                user=self.user2,
+                title="Not Liked Audio",
+                file=create_dummy_file("notliked.mp3"),
+                is_public=True,
+            )
+            self.audio4_disliked = AudioFile.objects.create(
+                user=self.user2,
+                title="Disliked Audio",
+                file=create_dummy_file("disliked.mp3"),
+                is_public=True,
+            )
+        Like.objects.create(user=self.user1, audio_file=self.audio1, is_liked=True)
+        Like.objects.create(user=self.user1, audio_file=self.audio2, is_liked=True)
+        Like.objects.create(
+            user=self.user1, audio_file=self.audio4_disliked, is_liked=False
+        )
+
+    def _login_user1(self):
+        self.client.post(self.login_url, self.user1_login_data, format="json")
+
+    def test_get_liked_audio_files_authenticated(self):
+        self._login_user1()
+        response = self.client.get(self.liked_audio_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        returned_titles = sorted([item["title"] for item in response.data])
+        expected_titles = sorted([self.audio1.title, self.audio2.title])
+        self.assertEqual(returned_titles, expected_titles)
+
+    def test_get_liked_audio_files_no_likes(self):
+        user2_login_data = {
+            "email": "user2_nolikes@example.com",
+            "password": "password",
+        }
+        self.client.post(self.login_url, user2_login_data, format="json")
+        response = self.client.get(self.liked_audio_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+    def test_get_liked_audio_files_unauthenticated(self):
+        response = self.client.get(self.liked_audio_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AudioFileLikesCountViewTests(APITestCase):
+    # ... (kod tej klasy pozostaje bez zmian) ...
+    def setUp(self):
+        self.user1 = User.objects.create_user(
+            email="counter1@example.com",
+            password="password",
+            name="Counter One",
+            is_active=True,
+        )
+        self.user2 = User.objects.create_user(
+            email="counter2@example.com",
+            password="password",
+            name="Counter Two",
+            is_active=True,
+        )
+        with patch("audio.models.set_s3_content_disposition_metadata"):
+            self.audio_file = AudioFile.objects.create(
+                user=self.user1,
+                title="Countable Audio",
+                file=create_dummy_file("countable.mp3"),
+                is_public=True,
+            )
+        self.likes_count_url = reverse(
+            "audio:audio-likes-count", kwargs={"uuid": self.audio_file.uuid}
+        )
+        self.non_existent_audio_likes_url = reverse(
+            "audio:audio-likes-count", kwargs={"uuid": uuid.uuid4()}
+        )
+        Like.objects.create(user=self.user1, audio_file=self.audio_file, is_liked=True)
+        Like.objects.create(user=self.user2, audio_file=self.audio_file, is_liked=True)
+        disliker = User.objects.create_user(
+            email="disliker_count@example.com",
+            password="password",
+            name="Disliker Count",
+            is_active=True,
+        )
+        Like.objects.create(user=disliker, audio_file=self.audio_file, is_liked=False)
+
+    def test_get_likes_count_success(self):
+        response = self.client.get(self.likes_count_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("likes"), 2)
+        self.assertEqual(response.data.get("dislikes"), 1)
+
+    def test_get_likes_count_no_likes_or_dislikes(self):
+        Like.objects.filter(audio_file=self.audio_file).delete()
+        response = self.client.get(self.likes_count_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("likes"), 0)
+        self.assertEqual(response.data.get("dislikes"), 0)
+
+    def test_get_likes_count_non_existent_audio(self):
+        response = self.client.get(self.non_existent_audio_likes_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+# === NOWE KLASY TESTOWE PONIŻEJ ===
+
+
+class TagListViewTests(APITestCase):
+    """
+    Test suite for TagListView (/api/audio/tags/).
+    """
+
+    def setUp(self):
+        self.tags_url = reverse("audio:tag-list")
+        self.tag1 = Tag.objects.create(name="Rock")
+        self.tag2 = Tag.objects.create(name="Electronic")
+        self.tag3 = Tag.objects.create(name="Jazz")
+
+        # Create some audio files and associate tags to test audio_count
+        user = User.objects.create_user(
+            email="tagtestuser@example.com", password="password"
+        )
+        with patch("audio.models.set_s3_content_disposition_metadata"):  # Mock signal
+            audio1 = AudioFile.objects.create(
+                user=user, title="Rock Song", file=create_dummy_file("rock.mp3")
+            )
+            audio1.tags.add(self.tag1)
+            audio2 = AudioFile.objects.create(
+                user=user,
+                title="Electronic Track",
+                file=create_dummy_file("electro.mp3"),
+            )
+            audio2.tags.add(self.tag2)
+            audio3 = AudioFile.objects.create(
+                user=user,
+                title="Another Rock Song",
+                file=create_dummy_file("rock2.mp3"),
+            )
+            audio3.tags.add(self.tag1)
+
+    def test_get_tag_list(self):
+        """Tests retrieving the list of all tags with audio counts."""
+        response = self.client.get(self.tags_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)  # We created 3 tags
+
+        # Check data for each tag - order might not be guaranteed unless specified in view/queryset
+        tag_data_map = {item["name"]: item for item in response.data}
+
+        self.assertIn("Rock", tag_data_map)
+        self.assertEqual(tag_data_map["Rock"]["audio_count"], 2)
+
+        self.assertIn("Electronic", tag_data_map)
+        self.assertEqual(tag_data_map["Electronic"]["audio_count"], 1)
+
+        self.assertIn("Jazz", tag_data_map)
+        self.assertEqual(tag_data_map["Jazz"]["audio_count"], 0)
+
+    def test_get_tag_list_empty(self):
+        """Tests retrieving tag list when no tags exist."""
+        Tag.objects.all().delete()  # Delete all tags
+        response = self.client.get(self.tags_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+
+class AudioFilesByTagViewTests(APITestCase):
+    """
+    Test suite for AudioFilesByTagView (/api/audio/tags/<tag_name>/).
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="tagfilteruser@example.com",
+            password="password",
+            name="TagFilter User",
+            is_active=True,
+        )
+        self.tag_rock = Tag.objects.create(name="Rock")
+        self.tag_pop = Tag.objects.create(name="Pop")
+
+        with patch("audio.models.set_s3_content_disposition_metadata"):  # Mock signal
+            self.rock_audio1 = AudioFile.objects.create(
+                user=self.user,
+                title="Rock Song 1",
+                file=create_dummy_file("rock1.mp3"),
+                is_public=True,
+            )
+            self.rock_audio1.tags.add(self.tag_rock)
+
+            time.sleep(0.01)  # ensure different uploaded_at
+            self.rock_audio2_private = AudioFile.objects.create(
+                user=self.user,
+                title="Rock Song 2 Private",
+                file=create_dummy_file("rock2priv.mp3"),
+                is_public=False,
+            )
+            self.rock_audio2_private.tags.add(self.tag_rock)
+
+            time.sleep(0.01)
+            self.pop_audio1 = AudioFile.objects.create(
+                user=self.user,
+                title="Pop Song 1",
+                file=create_dummy_file("pop1.mp3"),
+                is_public=True,
+            )
+            self.pop_audio1.tags.add(self.tag_pop)
+
+            time.sleep(0.01)
+            self.rock_pop_audio = AudioFile.objects.create(
+                user=self.user,
+                title="Rock Pop Song",
+                file=create_dummy_file("rockpop.mp3"),
+                is_public=True,
+            )
+            self.rock_pop_audio.tags.add(self.tag_rock, self.tag_pop)
+
+        self.rock_tag_url = reverse("audio:audio-by-tag", kwargs={"tag_name": "Rock"})
+        self.pop_tag_url = reverse("audio:audio-by-tag", kwargs={"tag_name": "Pop"})
+        self.non_existent_tag_url = reverse(
+            "audio:audio-by-tag", kwargs={"tag_name": "NonExistentTag"}
+        )
+
+    def test_get_audio_files_by_rock_tag(self):
+        """Tests retrieving public audio files tagged with 'Rock'."""
+        response = self.client.get(self.rock_tag_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Expected public rock songs: rock_pop_audio, rock_audio1 (newest first)
+        self.assertEqual(len(response.data), 2)
+        returned_titles = [item["title"] for item in response.data]
+        self.assertIn(self.rock_audio1.title, returned_titles)
+        self.assertIn(self.rock_pop_audio.title, returned_titles)
+        self.assertEqual(returned_titles[0], self.rock_pop_audio.title)  # Newest
+        self.assertEqual(returned_titles[1], self.rock_audio1.title)
+
+    def test_get_audio_files_by_pop_tag(self):
+        """Tests retrieving public audio files tagged with 'Pop'."""
+        response = self.client.get(self.pop_tag_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Expected public pop songs: rock_pop_audio, pop_audio1 (newest first)
+        self.assertEqual(len(response.data), 2)
+        returned_titles = [item["title"] for item in response.data]
+        self.assertIn(self.pop_audio1.title, returned_titles)
+        self.assertIn(self.rock_pop_audio.title, returned_titles)
+        self.assertEqual(returned_titles[0], self.rock_pop_audio.title)  # Newest
+        self.assertEqual(returned_titles[1], self.pop_audio1.title)
+
+    def test_get_audio_files_by_non_existent_tag(self):
+        """Tests retrieving audio files for a tag that does not exist or has no public audio."""
+        response = self.client.get(self.non_existent_tag_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)  # Expect an empty list
