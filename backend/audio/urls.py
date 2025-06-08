@@ -13,6 +13,8 @@ from .views import (
     UserLikedAudioFilesView,
 )
 
+app_name = "audio"
+
 urlpatterns = [
     path("upload/", AudioFileUploadView.as_view(), name="audio-upload"),
     path("latest/", LatestAudioFilesView.as_view(), name="audio-latest"),
