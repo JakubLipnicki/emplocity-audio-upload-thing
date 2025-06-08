@@ -145,20 +145,22 @@ class TopRatedAudioFilesView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        queryset = (
-            AudioFile.objects.filter(is_public=True)
-            .annotate(
-                likes_count=Count("likes", filter=F("likes__is_liked")),
-                dislikes_count=Count("likes", filter=~F("likes__is_liked")),
+        search_query = request.query_params.get("search", "")
+
+        queryset = AudioFile.objects.filter(is_public=True)
+
+        if search_query:
+            queryset = queryset.filter(title__icontains=search_query)
+
+        queryset = queryset.annotate(
+            likes_count=Count("likes", filter=F("likes__is_liked")),
+            dislikes_count=Count("likes", filter=~F("likes__is_liked")),
+        ).annotate(
+            like_ratio=ExpressionWrapper(
+                F("likes_count") / (F("dislikes_count") + Value(1)),
+                output_field=FloatField(),
             )
-            .annotate(
-                like_ratio=ExpressionWrapper(
-                    F("likes_count") / (F("dislikes_count") + Value(1)),
-                    output_field=FloatField(),
-                )
-            )
-            .order_by("-like_ratio", "-uploaded_at")
-        )
+        ).order_by("-like_ratio", "-uploaded_at")
 
         serializer = AudioFileSerializer(queryset, many=True)
         return Response(serializer.data)
