@@ -28,11 +28,18 @@ from .payu_service import create_payu_order_api_call
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def initiate_payment_view(request):
+    """
+    API view to initiate a payment with PayU using Django REST Framework decorators.
+    Expects JSON: {'amount': (int, grosze), 'description': (str)}
+    User MUST be authenticated (handled by @permission_classes).
+    """
     current_user = request.user
+
     try:
         data = request.data
         amount_raw = data.get("amount")
         description = data.get("description")
+
         if amount_raw is None:
             return Response(
                 {"error": "Amount is required."}, status=status.HTTP_400_BAD_REQUEST
@@ -54,6 +61,7 @@ def initiate_payment_view(request):
                 {"error": "Description is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
     except Exception as e:
         print(
             f"PAYMENTS_VIEW_ERROR: Error processing request data in initiate_payment_view: {str(e)}"
@@ -73,6 +81,7 @@ def initiate_payment_view(request):
         final_first_name = name_parts[0]
         if len(name_parts) > 1:
             final_last_name = name_parts[1]
+
     try:
         order = PaymentOrder.objects.create(
             user=current_user,
@@ -93,6 +102,7 @@ def initiate_payment_view(request):
             {"error": "Internal server error: Could not create order record."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
     try:
         notify_url_path = reverse("payments:payu_notify_callback")
         continue_url_path = reverse("payments:payment_finish_page")
@@ -109,6 +119,7 @@ def initiate_payment_view(request):
             {"error": "Internal server error: Callback URL configuration error."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     customer_ip = (
         x_forwarded_for.split(",")[0].strip()
@@ -120,6 +131,7 @@ def initiate_payment_view(request):
         print(
             "PAYMENTS_VIEW_WARNING: Customer IP not found. Using fallback '127.0.0.1'."
         )
+
     payu_payload = {
         "notifyUrl": notify_url,
         "continueUrl": continue_url,
@@ -139,7 +151,9 @@ def initiate_payment_view(request):
             {"name": order.description, "unitPrice": str(order.amount), "quantity": "1"}
         ],
     }
+
     payu_response_data = create_payu_order_api_call(payu_payload)
+
     if (
         not payu_response_data
         or "error" in payu_response_data
@@ -165,12 +179,15 @@ def initiate_payment_view(request):
             {"error": "Failed to initiate payment with PayU.", "details": error_detail},
             status=status.HTTP_502_BAD_GATEWAY,
         )
+
     order.payu_order_id = payu_response_data.get("orderId")
     order.redirect_uri_payu = payu_response_data.get("redirectUri")
     order.save()
+
     print(
         f"PAYMENTS_VIEW_INFO: Initiated payment with PayU. PayU Order ID: {order.payu_order_id}. User: {current_user.email}. Redirecting."
     )
+
     return Response(
         {
             "message": "Payment initiated. Redirecting to PayU...",
@@ -347,12 +364,16 @@ def payment_finish_page_view(request):
     Displays a status message to the user.
     """
     payu_error_code = request.GET.get("error")
+    # internal_order_id_from_url = request.GET.get('order_id') # Example if you pass your order_id
+
     context = {
         "page_title": "Status Płatności",
         "message": "Dziękujemy! Twoja płatność jest przetwarzana. Otrzymasz potwierdzenie o jej statusie niebawem.",
         "is_error": False,
         "FRONTEND_URL": settings.FRONTEND_URL,
+        "order": None,  # Placeholder for order details
     }
+
     if payu_error_code:
         context["message"] = (
             f"Wystąpił błąd podczas procesu płatności po stronie PayU (kod błędu: {payu_error_code}). Jeśli środki zostały pobrane, prosimy o kontakt z obsługą."
@@ -361,9 +382,35 @@ def payment_finish_page_view(request):
         print(
             f"PAYMENTS_VIEW_INFO: User redirected to finish page with PayU error code: {payu_error_code}"
         )
+    # elif internal_order_id_from_url:
+    #     try:
+    #         query_params = {'id': internal_order_id_from_url}
+    #         # If user is authenticated, ensure they can only see their own order details.
+    #         if request.user.is_authenticated:
+    #             query_params['user'] = request.user
+
+    #         order = PaymentOrder.objects.get(**query_params)
+    #         context['order'] = order
+    #         if order.status == PaymentOrder.Status.COMPLETED:
+    #             context['message'] = "Twoja płatność została pomyślnie zakończona! Dziękujemy za zakup."
+    #         elif order.status == PaymentOrder.Status.CANCELED:
+    #             context['message'] = "Twoja płatność została anulowana."
+    #         elif order.status == PaymentOrder.Status.FAILED:
+    #             context['message'] = "Niestety, Twoja płatność nie powiodła się. Spróbuj ponownie lub skontaktuj się z nami."
+    #             context['is_error'] = True
+    #         # For PENDING or PROCESSING, the default message is generally appropriate.
+    #     except PaymentOrder.DoesNotExist:
+    #         print(f"PAYMENTS_VIEW_WARNING: User redirected to finish page, but order with ID {internal_order_id_from_url} not found or access denied.")
+    #         # Do not reveal specific order details if not found or access denied.
+    #         context['message'] = "Nie można odnaleźć informacji o Twoim zamówieniu. Skontaktuj się z obsługą, jeśli płatność została dokonana."
+    #         context['is_error'] = True
     else:
         print(
             f"PAYMENTS_VIEW_INFO: User redirected to finish page. No immediate PayU error in URL."
         )
 
+    # Ensure the template path is correct based on your project structure
+    # If payment_finish.html is in payments/templates/payments/payment_finish.html:
     return render(request, "payments/payment_finish.html", context)
+    # If payment_finish.html is in payments/templates/payment_finish.html:
+    # return render(request, 'payment_finish.html', context) # This would be unusual for app templates with APP_DIRS=True
