@@ -1,10 +1,11 @@
-from accounts.authentication import JWTAuthentication
 from django.db.models import Count, ExpressionWrapper, F, FloatField, Q, Value
 from rest_framework import generics, permissions
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from accounts.authentication import JWTAuthentication
 
 from .models import AudioFile, Like, Tag
 from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer

@@ -1,84 +1,70 @@
-# payments/views.py
+# backend/payments/views.py
 import hashlib
 import hmac
 import json
 
-from accounts.authentication import (
-    JWTAuthentication,
-)  # Twoja niestandardowa klasa autentykacji
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
 from django.shortcuts import render
 from django.urls import reverse
-from django.views.decorators.csrf import (
-    csrf_exempt,
-)  # Nadal potrzebne dla widoków nie-DRF i IPN
-
-# JsonResponse nie jest już potrzebny w initiate_payment_view, jeśli używamy DRF Response
-from django.views.decorators.http import (
-    require_POST,
-)  # Nadal potrzebne dla widoków nie-DRF
-from rest_framework import status  # Używamy statusów z DRF
-
-# Importy dla Django REST Framework
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from rest_framework import status
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
     permission_classes,
 )
-from rest_framework.permissions import (
-    IsAuthenticated,
-)  # Standardowa klasa uprawnień DRF
-from rest_framework.response import Response  # Używamy Response z DRF
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from accounts.authentication import JWTAuthentication
 
 from .models import PaymentOrder
 from .payu_service import create_payu_order_api_call
 
 
-# Dekoratory DRF dla initiate_payment_view
 @api_view(["POST"])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def initiate_payment_view(request):
-    current_user = request.user
+    """
+    API view to initiate a payment with PayU using Django REST Framework decorators.
+    Expects JSON: {'amount': (int, grosze), 'description': (str)}
+    User MUST be authenticated (handled by @permission_classes).
+    """
+    current_user = (
+        request.user
+    )  # Dzięki dekoratorom, request.user jest już uwierzytelnionym użytkownikiem
+
     try:
         data = request.data
-        amount_raw = data.get("amount")  # Pobierz surową wartość
+        amount_raw = data.get("amount")
         description = data.get("description")
 
-        # --- ZMODYFIKOWANA WALIDACJA ---
-        if amount_raw is None:  # Sprawdź najpierw, czy 'amount' w ogóle jest
+        if amount_raw is None:
             return Response(
                 {"error": "Amount is required."}, status=status.HTTP_400_BAD_REQUEST
             )
-
         try:
-            amount = int(amount_raw)  # Dopiero teraz próbuj konwertować na int
-        except (
-            ValueError,
-            TypeError,
-        ):  # Jeśli konwersja się nie uda (np. amount_raw to "abc")
+            amount = int(amount_raw)
+        except (ValueError, TypeError):
             return Response(
                 {"error": "Invalid amount format. Must be an integer."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        if amount <= 0:  # Sprawdź, czy kwota jest dodatnia
+        if amount <= 0:
             return Response(
                 {"error": "Invalid amount (must be positive integer in grosze)."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if not description:
             return Response(
                 {"error": "Description is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # --- KONIEC ZMODYFIKOWANEJ WALIDACJI ---
 
-    except (
-        Exception
-    ) as e:  # Ogólny wyjątek, jeśli coś innego pójdzie nie tak przy odczycie danych
+    except Exception as e:
         print(
             f"PAYMENTS_VIEW_ERROR: Error processing request data in initiate_payment_view: {str(e)}"
         )
@@ -90,10 +76,8 @@ def initiate_payment_view(request):
     user_display_name = getattr(current_user, "name", "")
     user_first_name = getattr(current_user, "first_name", "")
     user_last_name = getattr(current_user, "last_name", "")
-
     final_first_name = user_first_name
     final_last_name = user_last_name
-
     if not final_first_name and not final_last_name and user_display_name:
         name_parts = user_display_name.strip().split(" ", 1)
         final_first_name = name_parts[0]
@@ -191,7 +175,6 @@ def initiate_payment_view(request):
             print(
                 f"PAYMENTS_VIEW_ERROR: Empty/invalid response from PayU service: {payu_response_data}"
             )
-
         order.status = PaymentOrder.Status.FAILED
         order.save()
         return Response(
@@ -221,28 +204,25 @@ def initiate_payment_view(request):
 @csrf_exempt
 @require_POST
 def payu_notification_receiver_view(request):
+    # ... (kod tego widoku pozostaje taki sam jak w poprzedniej pełnej wersji) ...
     print("PAYMENTS_VIEW_INFO: Received a notification from PayU.")
     raw_notification_body = request.body
     signature_header = request.headers.get("OpenPayU-Signature")
-
     if not signature_header:
         print(
             "PAYMENTS_VIEW_ERROR: PayU notification missing 'OpenPayU-Signature' header."
         )
         return HttpResponseBadRequest("Missing signature header.")
-
     received_signature_value = None
     for part in signature_header.split(";"):
         if part.strip().startswith("signature="):
             received_signature_value = part.split("=", 1)[1].strip()
             break
-
     if not received_signature_value:
         print(
             "PAYMENTS_VIEW_ERROR: Could not extract signature from 'OpenPayU-Signature' header."
         )
         return HttpResponseBadRequest("Malformed signature header.")
-
     payu_signature_key = settings.PAYU_SIGNATURE_KEY
     if not payu_signature_key:
         print(
@@ -251,18 +231,14 @@ def payu_notification_receiver_view(request):
         return HttpResponseServerError(
             "Internal server configuration error for signature key."
         )
-
     concatenated_value = raw_notification_body + payu_signature_key.encode("utf-8")
     expected_signature = hashlib.sha256(concatenated_value).hexdigest()
-
     if not hmac.compare_digest(expected_signature, received_signature_value):
         print(
             f"PAYMENTS_VIEW_ERROR: Invalid PayU notification signature. Expected: {expected_signature}, Received: {received_signature_value}"
         )
         return HttpResponseBadRequest("Invalid signature.")
-
     print("PAYMENTS_VIEW_INFO: PayU notification signature verified successfully.")
-
     try:
         notification_data = json.loads(raw_notification_body.decode("utf-8"))
     except json.JSONDecodeError as e:
@@ -270,20 +246,16 @@ def payu_notification_receiver_view(request):
             f"PAYMENTS_VIEW_ERROR: JSONDecodeError from PayU notification. Error: {e}. Body snippet: {raw_notification_body.decode('utf-8')[:200]}"
         )
         return HttpResponseBadRequest("Invalid JSON payload in notification.")
-
     order_info = notification_data.get("order")
     if not order_info:
         print("PAYMENTS_VIEW_ERROR: 'order' object missing in PayU notification.")
         return HttpResponseBadRequest("Missing 'order' data in notification.")
-
     payu_order_id = order_info.get("orderId")
     ext_order_id = order_info.get("extOrderId")
     payu_status = order_info.get("status")
-
     print(
         f"PAYMENTS_VIEW_INFO: Processing IPN for extOrderId: {ext_order_id}, PayU Order ID: {payu_order_id}, PayU Status: {payu_status}"
     )
-
     order_to_update = None
     if ext_order_id:
         try:
@@ -312,21 +284,17 @@ def payu_notification_receiver_view(request):
             "PAYMENTS_VIEW_ERROR: Both extOrderId and orderId missing in notification."
         )
         return HttpResponseBadRequest("Missing order identifiers in notification.")
-
     if not order_to_update:
         print(
             "PAYMENTS_VIEW_ERROR: Failed to identify order to update from IPN after checks."
         )
         return HttpResponse("Order identification failed, acknowledged.", status=200)
-
     previous_status = order_to_update.status
-
     if payu_status == "COMPLETED":
         order_to_update.status = PaymentOrder.Status.COMPLETED
         print(
             f"PAYMENTS_VIEW_INFO: Order {order_to_update.ext_order_id} status set to COMPLETED."
         )
-
         if order_to_update.user:
             user_to_update = order_to_update.user
             purchased_item_description = order_to_update.description
@@ -354,7 +322,6 @@ def payu_notification_receiver_view(request):
             print(
                 f"  WARNING: PaymentOrder {order_to_update.ext_order_id} is COMPLETED but has no associated user to update."
             )
-
     elif payu_status == "CANCELED":
         order_to_update.status = PaymentOrder.Status.CANCELED
         print(
@@ -375,15 +342,13 @@ def payu_notification_receiver_view(request):
             PaymentOrder.Status.CANCELED,
         ]:
             order_to_update.status = PaymentOrder.Status.FAILED
-
     if not order_to_update.payu_order_id and payu_order_id:
         order_to_update.payu_order_id = payu_order_id
-
     if previous_status != order_to_update.status or (
         order_to_update.payu_order_id is None
         and payu_order_id is not None
         and order_to_update.payu_order_id != payu_order_id
-    ):
+    ):  # Check if payu_order_id was newly added or changed
         order_to_update.save()
         print(
             f"PAYMENTS_VIEW_INFO: Saved changes for order {order_to_update.ext_order_id}. New status: {order_to_update.status}"
@@ -392,7 +357,6 @@ def payu_notification_receiver_view(request):
         print(
             f"PAYMENTS_VIEW_INFO: No status/PayU ID change requiring save for order {order_to_update.ext_order_id}. Current status: {order_to_update.status}"
         )
-
     return HttpResponse("Notification processed.", status=200)
 
 
@@ -409,7 +373,6 @@ def payment_finish_page_view(request):
         "is_error": False,
         "FRONTEND_URL": settings.FRONTEND_URL,
     }
-
     if payu_error_code:
         context["message"] = (
             f"Wystąpił błąd podczas procesu płatności po stronie PayU (kod błędu: {payu_error_code}). Jeśli środki zostały pobrane, prosimy o kontakt z obsługą."
@@ -422,5 +385,4 @@ def payment_finish_page_view(request):
         print(
             f"PAYMENTS_VIEW_INFO: User redirected to finish page. No immediate PayU error in URL."
         )
-
     return render(request, "payments/payments/payment_finish.html", context)

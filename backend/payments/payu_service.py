@@ -2,9 +2,9 @@
 import json  # For working with JSON data
 
 import requests  # For making HTTP requests
-from django.conf import (
+from django.conf import (  # To access Django project settings (PAYU_*, YOUR_APP_BASE_URL)
     settings,
-)  # To access Django project settings (PAYU_*, YOUR_APP_BASE_URL)
+)
 from django.core.cache import cache  # For caching the PayU access token
 
 # Unique cache key for storing the PayU access token.
