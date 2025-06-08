@@ -65,10 +65,10 @@ class CommentRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     def perform_update(self, serializer):
         comment = self.get_object()
         if comment.user != self.request.user:
-            raise PermissionDenied("Możesz edytować tylko swoje komentarze.")
+            raise PermissionDenied("You can only edit your own comments.")
         serializer.save()
 
     def perform_destroy(self, instance):
         if instance.user != self.request.user:
-            raise PermissionDenied("Możesz usuwać tylko swoje komentarze.")
+            raise PermissionDenied("You can only delete your own comments.")
         instance.delete()
