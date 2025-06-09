@@ -1,51 +1,67 @@
 # backend/payments/tests.py
+import hashlib
+import hmac
+import json
+import time
+from unittest.mock import MagicMock, patch
+
+import requests  # Dla requests.exceptions.HTTPError
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.test import TestCase  # <--- POPRAWIONY IMPORT
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from django.test import TestCase # <--- POPRAWIONY IMPORT
-from django.contrib.auth import get_user_model
-from django.conf import settings
-import json
-import hashlib
-import hmac
-from unittest.mock import patch, MagicMock
-import time
-from django.core.cache import cache
-import requests # Dla requests.exceptions.HTTPError
 
 from .models import PaymentOrder
-from .payu_service import get_payu_access_token, create_payu_order_api_call, PAYU_ACCESS_TOKEN_CACHE_KEY
+from .payu_service import (
+    PAYU_ACCESS_TOKEN_CACHE_KEY,
+    create_payu_order_api_call,
+    get_payu_access_token,
+)
 
 User = get_user_model()
 
+
 def generate_payu_signature(data_bytes, signature_key):
-    concatenated = data_bytes + signature_key.encode('utf-8')
+    concatenated = data_bytes + signature_key.encode("utf-8")
     return hashlib.sha256(concatenated).hexdigest()
+
 
 class PaymentInitiationTests(APITestCase):
     def setUp(self):
-        self.initiate_payment_url = reverse('payments:initiate_payment_api')
-        self.login_url = reverse('login')
-        self.test_user_email = 'paymentuser_for_payments_app@example.com'
-        self.test_user_password = 'testpassword123'
+        self.initiate_payment_url = reverse("payments:initiate_payment_api")
+        self.login_url = reverse("login")
+        self.test_user_email = "paymentuser_for_payments_app@example.com"
+        self.test_user_password = "testpassword123"
         self.user = User.objects.create_user(
             email=self.test_user_email,
             password=self.test_user_password,
-            name='Payments App Test User',
-            is_active=True
+            name="Payments App Test User",
+            is_active=True,
         )
-        self.login_data = {'email': self.test_user_email, 'password': self.test_user_password}
-        self.valid_payload = {
-            'amount': 1000,
-            'description': 'Testowa Ramka Profilowa Premium (z payments tests)'
+        self.login_data = {
+            "email": self.test_user_email,
+            "password": self.test_user_password,
         }
-        self.payload_missing_amount = {'description': 'Test bez kwoty'}
-        self.payload_invalid_amount_zero = {'amount': 0, 'description': 'Test z kwotą zero'}
-        self.payload_invalid_amount_negative = {'amount': -100, 'description': 'Test z kwotą ujemną'}
-        self.payload_missing_description = {'amount': 1000}
+        self.valid_payload = {
+            "amount": 1000,
+            "description": "Testowa Ramka Profilowa Premium (z payments tests)",
+        }
+        self.payload_missing_amount = {"description": "Test bez kwoty"}
+        self.payload_invalid_amount_zero = {
+            "amount": 0,
+            "description": "Test z kwotą zero",
+        }
+        self.payload_invalid_amount_negative = {
+            "amount": -100,
+            "description": "Test z kwotą ujemną",
+        }
+        self.payload_missing_description = {"amount": 1000}
 
     def _login_user_for_test(self):
-        response = self.client.post(self.login_url, self.login_data, format='json')
+        response = self.client.post(self.login_url, self.login_data, format="json")
         self.assertEqual(
             response.status_code, status.HTTP_200_OK, "Pre-test login failed."
         )
@@ -347,99 +363,108 @@ class PayUServiceTests(TestCase):
     def setUp(self):
         cache.delete(PAYU_ACCESS_TOKEN_CACHE_KEY)
 
-    @patch('payments.payu_service.requests.post')
+    @patch("payments.payu_service.requests.post")
     def test_get_payu_access_token_success(self, mock_post):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            'access_token': 'test_access_token_123',
-            'expires_in': 3600,
-            'token_type': 'bearer',
-            'grant_type': 'client_credentials'
+            "access_token": "test_access_token_123",
+            "expires_in": 3600,
+            "token_type": "bearer",
+            "grant_type": "client_credentials",
         }
         mock_post.return_value = mock_response
         token = get_payu_access_token()
-        self.assertEqual(token, 'test_access_token_123')
+        self.assertEqual(token, "test_access_token_123")
         mock_post.assert_called_once_with(
             settings.PAYU_OAUTH_URL,
             data={
-                'grant_type': 'client_credentials',
-                'client_id': settings.PAYU_OAUTH_CLIENT_ID,
-                'client_secret': settings.PAYU_OAUTH_CLIENT_SECRET,
+                "grant_type": "client_credentials",
+                "client_id": settings.PAYU_OAUTH_CLIENT_ID,
+                "client_secret": settings.PAYU_OAUTH_CLIENT_SECRET,
             },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'},
-            timeout=10
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=10,
         )
-        self.assertEqual(cache.get(PAYU_ACCESS_TOKEN_CACHE_KEY), 'test_access_token_123')
+        self.assertEqual(
+            cache.get(PAYU_ACCESS_TOKEN_CACHE_KEY), "test_access_token_123"
+        )
         mock_post.reset_mock()
         token_from_cache = get_payu_access_token()
-        self.assertEqual(token_from_cache, 'test_access_token_123')
+        self.assertEqual(token_from_cache, "test_access_token_123")
         mock_post.assert_not_called()
 
-    @patch('payments.payu_service.requests.post')
+    @patch("payments.payu_service.requests.post")
     def test_get_payu_access_token_http_error(self, mock_post):
         mock_response = MagicMock()
         mock_response.status_code = 401
         mock_response.text = "Unauthorized client"
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            response=mock_response
+        )
         mock_post.return_value = mock_response
         token = get_payu_access_token()
         self.assertIsNone(token)
         mock_post.assert_called_once()
 
-    @patch('payments.payu_service.get_payu_access_token')
-    @patch('payments.payu_service.requests.post')
+    @patch("payments.payu_service.get_payu_access_token")
+    @patch("payments.payu_service.requests.post")
     def test_create_payu_order_api_call_success(self, mock_order_post, mock_get_token):
-        mock_get_token.return_value = 'mocked_access_token_for_order'
+        mock_get_token.return_value = "mocked_access_token_for_order"
         mock_api_response = MagicMock()
         mock_api_response.status_code = 201
         mock_api_response.json.return_value = {
-            'status': {'statusCode': 'SUCCESS'},
-            'redirectUri': 'https://payu.com/redirect/mock',
-            'orderId': 'PAYU_ORDER_XYZ789'
+            "status": {"statusCode": "SUCCESS"},
+            "redirectUri": "https://payu.com/redirect/mock",
+            "orderId": "PAYU_ORDER_XYZ789",
         }
         mock_order_post.return_value = mock_api_response
         test_payload = {"description": "Test Order", "totalAmount": "100"}
         response_data = create_payu_order_api_call(test_payload)
         self.assertIsNotNone(response_data)
-        self.assertNotIn('error', response_data)
-        self.assertEqual(response_data['redirectUri'], 'https://payu.com/redirect/mock')
-        self.assertEqual(response_data['orderId'], 'PAYU_ORDER_XYZ789')
+        self.assertNotIn("error", response_data)
+        self.assertEqual(response_data["redirectUri"], "https://payu.com/redirect/mock")
+        self.assertEqual(response_data["orderId"], "PAYU_ORDER_XYZ789")
         mock_order_post.assert_called_once_with(
             settings.PAYU_API_ORDER_URL,
             json=test_payload,
             headers={
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer mocked_access_token_for_order'
+                "Content-Type": "application/json",
+                "Authorization": "Bearer mocked_access_token_for_order",
             },
             timeout=15,
-            allow_redirects=False
+            allow_redirects=False,
         )
         mock_get_token.assert_called_once()
 
-    @patch('payments.payu_service.get_payu_access_token')
+    @patch("payments.payu_service.get_payu_access_token")
     def test_create_payu_order_api_call_token_failure(self, mock_get_token):
         mock_get_token.return_value = None
         test_payload = {"description": "Test Order", "totalAmount": "100"}
         response_data = create_payu_order_api_call(test_payload)
         self.assertIsNotNone(response_data)
-        self.assertIn('error', response_data)
-        self.assertEqual(response_data['error'], 'Failed to obtain access token')
+        self.assertIn("error", response_data)
+        self.assertEqual(response_data["error"], "Failed to obtain access token")
         mock_get_token.assert_called_once()
 
-    @patch('payments.payu_service.get_payu_access_token')
-    @patch('payments.payu_service.requests.post')
-    def test_create_payu_order_api_call_payu_returns_error(self, mock_order_post, mock_get_token):
-        mock_get_token.return_value = 'mocked_access_token_for_order'
+    @patch("payments.payu_service.get_payu_access_token")
+    @patch("payments.payu_service.requests.post")
+    def test_create_payu_order_api_call_payu_returns_error(
+        self, mock_order_post, mock_get_token
+    ):
+        mock_get_token.return_value = "mocked_access_token_for_order"
         mock_api_response = MagicMock()
         mock_api_response.status_code = 400
         mock_api_response.json.return_value = {
-            'status': {'statusCode': 'ERROR_VALUE_MISSING', 'statusDesc': 'Missing buyer email'}
+            "status": {
+                "statusCode": "ERROR_VALUE_MISSING",
+                "statusDesc": "Missing buyer email",
+            }
         }
         mock_order_post.return_value = mock_api_response
         test_payload = {"description": "Test Order", "totalAmount": "100"}
         response_data = create_payu_order_api_call(test_payload)
         self.assertIsNotNone(response_data)
-        self.assertEqual(response_data.get('status_code_received_from_payu'), 400)
-        self.assertIn('statusDesc', response_data.get('status', {}))
+        self.assertEqual(response_data.get("status_code_received_from_payu"), 400)
+        self.assertIn("statusDesc", response_data.get("status", {}))
         mock_order_post.assert_called_once()
