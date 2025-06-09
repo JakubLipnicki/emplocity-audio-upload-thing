@@ -20,7 +20,7 @@
       </div>
 
       <div>
-        <NuxtLink v-if="isAuthenticated" to="/profile/me">
+        <NuxtLink v-if="isAuthenticated" to="/login">
           <User class="h-6 w-6 text-gray-700 hover:text-blue-600" />
         </NuxtLink>
         <NuxtLink v-else to="/register">
@@ -35,7 +35,7 @@
 import { User } from "lucide-vue-next";
 
 // const { isAuthenticated } = useAuth();
-const isAuthenticated = false;
+const isAuthenticated = true;
 
 interface NavLink {
   label: string;
