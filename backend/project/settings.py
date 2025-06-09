@@ -142,8 +142,18 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 CORS_ORIGIN_ALLOW_ALL = True # Twoje istniejące ustawienie
 CORS_ALLOW_CREDENTIALS = True # Twoje istniejące ustawienie
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 
 ACCESS_TOKEN_EXPIRATION_TIME_HOURS = config("ACCESS_TOKEN_EXPIRATION_TIME_HOURS", default=1, cast=int) # Twoje istniejące ustawienie
 REFRESH_TOKEN_EXPIRATION_TIME_DAYS = config("REFRESH_TOKEN_EXPIRATION_TIME_DAYS", default=7, cast=int) # Twoje istniejące ustawienie
