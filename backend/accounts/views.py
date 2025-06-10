@@ -1,4 +1,9 @@
-# backend/accounts/views.py
+import datetime
+
+import jwt
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
+from django.utils.decorators import method_decorator
+from decouple import config
 from django.conf import settings
 from django.core.mail import send_mail
 from django.shortcuts import redirect
@@ -64,7 +69,7 @@ class VerifyEmailView(APIView):
             return redirect(f"{frontend_redirect_url}?success=true")
         return redirect(f"{frontend_redirect_url}?already_active=true")
 
-
+@method_decorator(ensure_csrf_cookie, name="dispatch")
 class LoginView(APIView):
     def post(self, request):
         email = request.data.get("email")
