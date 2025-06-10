@@ -20,53 +20,39 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+const { login, user } = useAuth();
 const router = useRouter();
 
-const formSchema = z
-  .object({
-    email: z.string().email({ message: "Podaj prawidlowy adres email" }),
-    password: z
-      .string()
-      .min(8, { message: "Haslo musi miec minimum 8 znakow" }),
-  })
+const formSchema = z.object({
+  email: z.string().email({ message: "Podaj prawidlowy adres email" }),
+  password: z.string().min(8, { message: "Haslo musi miec minimum 8 znakow" }),
+});
 
 const schema = toTypedSchema(formSchema);
 
-function onForgot() {
-  navigateTo("/request-password/")
+async function onSubmit(values) {
+  try {
+    await login({ email: values.email, password: values.password });
+
+    // After login succeeds, the `user` ref in useAuth will be populated.
+    // Now we can safely navigate.
+    if (user.value) {
+      // Best practice is to have a dedicated profile page like /profile/me
+      // or use the username/id from the now-populated user object.
+      navigateTo(`/profile/${user.value.name}`);
+    } else {
+      // Handle case where login succeeded but fetching user failed
+      console.error("Login succeeded, but failed to fetch user details.");
+    }
+  } catch (error) {
+    console.error("Login failed:", error);
+    // Here you can add logic to show an error message to the user
+  }
 }
 
-const onSubmit = async (values) => {
-
-  const config = useRuntimeConfig();
-
-  try {
-    const response = await fetch(`${config.public.apiRoot}/api/login`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: values.email,
-        password: values.password,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Error details:", data.detail);
-      return;
-    }
-
-    console.log("Login success:", data);
-    navigateTo(`/profile/${values.email}`)
-
-  } catch (error) {
-    console.error("Login error:", error);
-  }
-};
+function onForgot() {
+  navigateTo("/request-password/");
+}
 
 </script>
 

@@ -8,4 +8,3 @@ urlpatterns = [
     path("api/payments/", include("payments.urls", namespace="payments")),
     path("api/comments/", include("comments.urls")),
 ]
-

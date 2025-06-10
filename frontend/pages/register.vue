@@ -39,38 +39,36 @@ const formSchema = z
         path: ["confirmPassword"],
     });
 
-const schema = toTypedSchema(formSchema);
+    const schema = toTypedSchema(formSchema);
 
-const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log(values);
-    // console.log("Username: ", values.username)
+const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const config = useRuntimeConfig();
 
-    const config = useRuntimeConfig();
+  try {
+    const response = await fetch(`${config.public.apiRoot}/api/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: values.username,
+        email: values.email,
+        password: values.password,
+      }),
+    });
 
-    fetch(`${config.public.apiRoot}/api/register`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            name: values.username,
-            email: values.email,
-            password: values.password,
-        }),
-    })
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error("Registration failed");
-            }
-            return response.json();
-        })
-        .then((data) => {
-            console.log("Registration success:", data);
-            navigateTo(`/profile/${values.username}`);
-        })
-        .catch((error) => {
-            console.error("Registration error:", error);
-        });
+    const data = await response.json();
+
+    if (!response.ok) {
+      // You can get more specific with error handling here
+      throw new Error(data.detail || "Registration failed");
+    }
+
+    console.log("Registration success:", data);
+    // DON'T redirect to profile. Redirect to a page that says "Check your email".
+    navigateTo("/");
+  } catch (error) {
+    console.error("Registration error:", error);
+    // Show an error message to the user on the form
+  }
 };
 
 // const onSubmit = form.handleSubmit((values) => {

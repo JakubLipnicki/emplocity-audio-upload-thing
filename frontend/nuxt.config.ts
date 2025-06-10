@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiRoot: 'http://127.0.0.1:8000' // Your base URL without /api
+      apiRoot: 'http://localhost:8000' // Your base URL without /api
     }
   },
   compatibilityDate: "2024-11-01",
