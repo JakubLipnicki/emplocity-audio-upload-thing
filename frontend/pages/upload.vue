@@ -30,6 +30,25 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium mb-2">Tagi</label>
+          <div
+            v-if="availableTags.length > 0"
+            class="flex flex-wrap gap-2"
+          >
+            <Badge
+              v-for="tag in availableTags"
+              :key="tag.id"
+              :variant="selectedTags.has(tag.name) ? 'default' : 'outline'"
+              class="cursor-pointer"
+              @click="toggleTag(tag.name)"
+            >
+              {{ tag.name }}
+            </Badge>
+          </div>
+          <p v-else class="text-sm text-gray-500">Ladowanie tagow...</p>
+        </div>
+
+        <div>
           <label for="audioFile" class="block text-sm font-medium mb-1"
             >Plik</label
           >
@@ -84,7 +103,7 @@
             <Switch id="is-public-switch" v-model:checked="isPublic" />
             <Label for="is-public-switch">Publiczny</Label>
           </div>
-        
+
           <button
             type="submit"
             class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -95,18 +114,45 @@
         </div>
       </form>
     </div>
+
+    <!-- --- NEW: SUCCESS DIALOG --- -->
+    <Dialog v-model:open="isSuccessDialogOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Sukces!</DialogTitle>
+          <DialogDescription>
+            Twój plik audio został pomyślnie przesłany.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button @click="isSuccessDialogOpen = false">Zamknij</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <!-- --- END: SUCCESS DIALOG --- -->
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { useNuxtApp } from "#app";
+import { useAuth } from "@/composables/useAuth";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/composables/useAuth";
+import { Badge } from "@/components/ui/badge";
+// --- NEW: IMPORT DIALOG COMPONENTS ---
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
-// --- 1. IMPORT useNuxtApp TO GET ACCESS TO OUR PLUGIN ---
-import { useNuxtApp } from "#app";
 const { accessToken } = useAuth();
+const { $api } = useNuxtApp();
 
 const title = ref("");
 const description = ref("");
@@ -116,14 +162,33 @@ const isUploading = ref(false);
 const fileInput = ref(null);
 const isPublic = ref(true);
 
-// --- 2. GET THE $api INSTANCE ---
-const { $api } = useNuxtApp();
+const availableTags = ref([]);
+const selectedTags = ref(new Set());
+
+// --- NEW: REF FOR DIALOG VISIBILITY ---
+const isSuccessDialogOpen = ref(false);
 
 const isValid = computed(() => {
   return title.value.trim() !== "" && selectedFile.value !== null;
 });
 
-// ... handleFileChange, validateFile, removeFile, formatFileSize functions remain the same ...
+onMounted(async () => {
+  try {
+    const response = await $api.get("/api/audio/tags/");
+    availableTags.value = response.data;
+  } catch (error) {
+    console.error("Failed to fetch tags:", error);
+  }
+});
+
+const toggleTag = (tagName) => {
+  if (selectedTags.value.has(tagName)) {
+    selectedTags.value.delete(tagName);
+  } else {
+    selectedTags.value.add(tagName);
+  }
+};
+
 const handleFileChange = (event) => {
   const file = event.target.files[0];
   if (file) {
@@ -174,28 +239,32 @@ const uploadFile = async () => {
     }
     formData.append("file", selectedFile.value);
     formData.append("is_public", isPublic.value.toString());
+    selectedTags.value.forEach((tag) => {
+      formData.append("tags", tag);
+    });
 
     const headers = {};
     if (accessToken.value) {
       headers["Authorization"] = `Bearer ${accessToken.value}`;
     }
-    // --- 3. REPLACE `fetch` WITH `$api.post` ---
-    // Axios automatically handles credentials and the CSRF token for us.
-    // It also automatically sets the 'Content-Type' to 'multipart/form-data'.
-    const response = await $api.post("/api/audio/upload/", formData, {
+
+    await $api.post("/api/audio/upload/", formData, {
       headers: headers,
     });
 
-    // Axios throws an error on non-2xx responses, so we don't need to check response.ok
-    // The success case is simply what comes after the await.
+    // Reset form on success
     title.value = "";
     description.value = "";
     selectedFile.value = null;
-    fileInput.value.value = "";
+    if (fileInput.value) {
+      fileInput.value.value = "";
+    }
     isPublic.value = true;
-    alert("Sukces!");
+    selectedTags.value.clear();
+
+    // --- REPLACE alert() WITH DIALOG TRIGGER ---
+    isSuccessDialogOpen.value = true;
   } catch (error) {
-    // Axios provides richer error details
     const errorMessage =
       error.response?.data?.detail ||
       error.message ||

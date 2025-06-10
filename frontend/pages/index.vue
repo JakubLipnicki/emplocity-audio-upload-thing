@@ -37,6 +37,8 @@ interface ApiAudioFile {
   user_vote: "like" | "dislike" | null;
   uploader: string | null;
   views: number;
+  // --- NEW: ADD TAGS PROPERTY ---
+  tags: string[];
 }
 interface AudioFile extends ApiAudioFile {}
 
@@ -54,20 +56,15 @@ const { isAuthenticated } = useAuth();
 
 const isFocused = useWindowFocus();
 
-// --- MODIFIED FUNCTION ---
 const toggleCommentSection = (uuid: string) => {
-  // First, check if the user is logged in.
   if (!isAuthenticated.value) {
-    // If not, redirect to the login page and stop.
     navigateTo("/login");
     return;
   }
-
-  // If they are logged in, proceed with the original toggle logic.
   if (activeCommentSection.value === uuid) {
-    activeCommentSection.value = null; // Close if already open
+    activeCommentSection.value = null;
   } else {
-    activeCommentSection.value = uuid; // Open new one
+    activeCommentSection.value = uuid;
   }
 };
 
@@ -217,6 +214,25 @@ const formatDate = (dateString: string) => {
             <CardDescription v-else class="mb-2 text-sm text-gray-500">
               Opis: Brak opisu
             </CardDescription>
+
+            <!-- --- NEW: TAGS SECTION --- -->
+            <div
+              v-if="audioFile.tags && audioFile.tags.length > 0"
+              class="my-3 flex flex-wrap gap-2"
+            >
+              <Button
+                v-for="tag in audioFile.tags"
+                :key="tag"
+                variant="outline"
+                size="sm"
+                class="h-7 cursor-default"
+                @click.prevent
+              >
+                {{ tag }}
+              </Button>
+            </div>
+            <!-- --- END: TAGS SECTION --- -->
+
             <audio
               controls
               :src="audioFile.file"
