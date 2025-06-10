@@ -35,7 +35,7 @@ interface AudioFile extends ApiAudioFile {}
 // --- All other <script setup> logic remains exactly the same ---
 const latestAudioFiles = ref<AudioFile[]>([]);
 const loading = ref(true);
-const loadingMore = ref(false);
+const loadingMore = ref(false);  
 const error = ref<string | null>(null);
 const page = ref(1);
 const hasMore = ref(true);
@@ -49,13 +49,16 @@ const fetchAudioFiles = async () => {
   error.value = null;
   const config = useRuntimeConfig();
   const apiRoot = config.public.apiRoot;
+
   try {
     const response = await $api.get<PaginatedResponse>(
       `/api/audio/latest/?page=${page.value}`
     );
     const data = response.data;
+
     const newFiles = data.results.map((file) => {
-      const fullFileUrl = new URL(file.file, apiRoot).href;
+      const fullFileUrl = new URL(file.file, config.public.mediaRoot).href;
+      
       return { ...file, file: fullFileUrl };
     });
     latestAudioFiles.value.push(...newFiles);
