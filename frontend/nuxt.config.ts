@@ -5,7 +5,8 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiRoot: 'http://localhost:8000' // Your base URL without /api
+      apiRoot: 'http://localhost:8000', 
+      mediaRoot: "http://localhost:9000/audio-files/",
     }
   },
   compatibilityDate: "2024-11-01",
