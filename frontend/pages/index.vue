@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
+import { useWindowFocus } from "@vueuse/core";
 import {
   Card,
   CardContent,
@@ -36,17 +37,42 @@ interface AudioFile extends ApiAudioFile {}
 // --- All other <script setup> logic remains exactly the same ---
 const latestAudioFiles = ref<AudioFile[]>([]);
 const loading = ref(true);
-const loadingMore = ref(false);  
+const loadingMore = ref(false);
 const error = ref<string | null>(null);
 const page = ref(1);
 const hasMore = ref(true);
+
 const { $api } = useNuxtApp();
 const { isAuthenticated } = useAuth();
 
+const isFocused = useWindowFocus();
+
+// We watch the focus state.
+watch(isFocused, (isNowFocused) => {
+  // We only act if the window becomes focused AND it's not the initial load.
+  // The `!loading.value` check prevents this from running on the first load.
+  if (isNowFocused && !loading.value) {
+    // Reset state to fetch the latest data from the beginning
+    latestAudioFiles.value = [];
+    page.value = 1;
+    hasMore.value = true;
+    fetchAudioFiles();
+  }
+});
+
 const fetchAudioFiles = async () => {
+  // --- THIS IS THE FIX: REMOVE THE FAULTY GUARD CONDITION ---
+  // The line `if (loading.value || loadingMore.value) return;` has been removed.
+
+  // This guard is still useful to prevent fetching beyond the last page.
   if (!hasMore.value) return;
-  if (page.value === 1) loading.value = true;
-  else loadingMore.value = true;
+
+  // Set the correct loading state
+  if (page.value === 1) {
+    loading.value = true;
+  } else {
+    loadingMore.value = true;
+  }
   error.value = null;
   const config = useRuntimeConfig();
   const apiRoot = config.public.apiRoot;
@@ -56,12 +82,11 @@ const fetchAudioFiles = async () => {
       `/api/audio/latest/?page=${page.value}`
     );
     const data = response.data;
-
     const newFiles = data.results.map((file) => {
-      const fullFileUrl = new URL(file.file, config.public.mediaRoot).href;
-      
+      const fullFileUrl = new URL(file.file, apiRoot).href;
       return { ...file, file: fullFileUrl };
     });
+
     latestAudioFiles.value.push(...newFiles);
     hasMore.value = data.has_more;
     page.value++;
@@ -69,13 +94,17 @@ const fetchAudioFiles = async () => {
     error.value = `Error fetching audio files: ${e.message}`;
     console.error("Fetch error:", e);
   } finally {
+    // This block will now be reached correctly on the initial load.
     loading.value = false;
     loadingMore.value = false;
   }
 };
+
+// This still correctly triggers the very first fetch.
 onMounted(() => {
   fetchAudioFiles();
 });
+
 const handleVote = async (
   file: AudioFile,
   voteType: "like" | "dislike"
