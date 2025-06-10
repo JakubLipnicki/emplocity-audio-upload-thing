@@ -58,7 +58,8 @@ class AudioFileSerializer(serializers.ModelSerializer):
         return obj.likes.filter(is_liked=False).count()
 
     def get_uploader(self, obj):
-        return obj.user.username if obj.user else "Anonim"
+        # return obj.user.username if obj.user else "Anonim"
+        return obj.user.name if obj.user else "Anonim"
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)

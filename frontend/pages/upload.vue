@@ -100,9 +100,13 @@
 
 <script setup>
 import { ref, computed } from "vue";
-
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/composables/useAuth";
+
+// --- 1. IMPORT useNuxtApp TO GET ACCESS TO OUR PLUGIN ---
+import { useNuxtApp } from "#app";
+const { accessToken } = useAuth();
 
 const title = ref("");
 const description = ref("");
@@ -110,20 +114,22 @@ const selectedFile = ref(null);
 const fileError = ref("");
 const isUploading = ref(false);
 const fileInput = ref(null);
+const isPublic = ref(true);
 
-const isPublic = ref(true); 
+// --- 2. GET THE $api INSTANCE ---
+const { $api } = useNuxtApp();
 
 const isValid = computed(() => {
   return title.value.trim() !== "" && selectedFile.value !== null;
 });
 
+// ... handleFileChange, validateFile, removeFile, formatFileSize functions remain the same ...
 const handleFileChange = (event) => {
   const file = event.target.files[0];
   if (file) {
     validateFile(file);
   }
 };
-
 const validateFile = (file) => {
   fileError.value = "";
   const allowedTypes = [".mp3", ".wav", ".m4a", ".ogg", ".flac"];
@@ -141,7 +147,6 @@ const validateFile = (file) => {
   }
   selectedFile.value = file;
 };
-
 const removeFile = (e) => {
   e.stopPropagation();
   selectedFile.value = null;
@@ -149,7 +154,6 @@ const removeFile = (e) => {
     fileInput.value.value = "";
   }
 };
-
 const formatFileSize = (bytes) => {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
@@ -161,7 +165,7 @@ const formatFileSize = (bytes) => {
 const uploadFile = async () => {
   if (!isValid.value) return;
   isUploading.value = true;
-  const config = useRuntimeConfig();
+
   try {
     const formData = new FormData();
     formData.append("title", title.value);
@@ -171,24 +175,33 @@ const uploadFile = async () => {
     formData.append("file", selectedFile.value);
     formData.append("is_public", isPublic.value.toString());
 
-    const response = await fetch(`${config.public.apiRoot}/api/audio/upload/`, {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-    if (response.ok) {
-      title.value = "";
-      description.value = ""; 
-      selectedFile.value = null;
-      fileInput.value.value = "";
-      isPublic.value = true; 
-      alert("Sukces!");
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || "Blad podczas przesylania");
+    const headers = {};
+    if (accessToken.value) {
+      headers["Authorization"] = `Bearer ${accessToken.value}`;
     }
+    // --- 3. REPLACE `fetch` WITH `$api.post` ---
+    // Axios automatically handles credentials and the CSRF token for us.
+    // It also automatically sets the 'Content-Type' to 'multipart/form-data'.
+    const response = await $api.post("/api/audio/upload/", formData, {
+      headers: headers,
+    });
+
+    // Axios throws an error on non-2xx responses, so we don't need to check response.ok
+    // The success case is simply what comes after the await.
+    title.value = "";
+    description.value = "";
+    selectedFile.value = null;
+    fileInput.value.value = "";
+    isPublic.value = true;
+    alert("Sukces!");
   } catch (error) {
-    fileError.value = error.message || "error upload";
+    // Axios provides richer error details
+    const errorMessage =
+      error.response?.data?.detail ||
+      error.message ||
+      "Blad podczas przesylania";
+    fileError.value = errorMessage;
+    console.error("Upload error:", error);
   } finally {
     isUploading.value = false;
   }
