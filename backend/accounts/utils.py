@@ -1,3 +1,5 @@
+# backend/accounts/utils.py
+
 import datetime
 
 import jwt
@@ -8,7 +10,7 @@ SECRET_KEY = settings.SECRET_KEY
 
 
 def generate_access_token(user_id):
-    expiration_time = settings.ACCESS_TOKEN_EXPIRATION_TIME_HOURS
+    expiration_time = getattr(settings, "ACCESS_TOKEN_EXPIRATION_TIME_HOURS", 24)
     payload = {
         "user_id": user_id,
         "type": "access",
@@ -19,7 +21,7 @@ def generate_access_token(user_id):
 
 
 def generate_refresh_token(user_id):
-    expiration_time = settings.REFRESH_TOKEN_EXPIRATION_TIME_DAYS
+    expiration_time = getattr(settings, "REFRESH_TOKEN_EXPIRATION_TIME_DAYS", 30)
     payload = {
         "user_id": user_id,
         "type": "refresh",
@@ -44,10 +46,12 @@ def decode_token(token, expected_type="access"):
 
 
 def generate_verification_token(user_id):
+    # Używamy getattr, aby bezpiecznie pobrać wartość z settings lub użyć domyślnej
+    expiration_time = getattr(settings, "EMAIL_VERIFICATION_EXPIRATION_HOURS", 1)
     payload = {
         "user_id": user_id,
         "type": "email_verification",
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=expiration_time),
         "iat": datetime.datetime.utcnow(),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
@@ -66,10 +70,12 @@ def decode_verification_token(token):
 
 
 def generate_password_reset_token(user_id):
+    # Używamy getattr, aby bezpiecznie pobrać wartość z settings lub użyć domyślnej
+    expiration_time = getattr(settings, "PASSWORD_RESET_EXPIRATION_MINUTES", 15)
     payload = {
         "user_id": user_id,
         "type": "password_reset",
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=15),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=expiration_time),
         "iat": datetime.datetime.utcnow(),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
