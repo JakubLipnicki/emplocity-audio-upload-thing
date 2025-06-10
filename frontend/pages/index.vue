@@ -24,10 +24,11 @@ interface ApiAudioFile {
   uploaded_at: string;
   file: string;
   description: string | null;
-  is_public: boolean; // We will use this field
+  is_public: boolean;
   likes_count: number;
   dislikes_count: number;
   user_vote: "like" | "dislike" | null;
+  uploader: string | null; // Add the uploader field
 }
 // ... other interfaces ...
 interface AudioFile extends ApiAudioFile {}
@@ -155,6 +156,10 @@ const formatDate = (dateString: string) => {
                 </Tooltip>
               </TooltipProvider>
             </div>
+
+            <CardDescription class="mb-2 mt-1 text-sm">
+            Author: {{ audioFile.uploader || "Anonim" }}
+          </CardDescription>
 
             <CardDescription class="mb-2 mt-1">
               Opublikowane: {{ formatDate(audioFile.uploaded_at) }}
