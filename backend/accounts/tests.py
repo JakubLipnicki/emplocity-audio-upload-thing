@@ -36,7 +36,8 @@ class AccountRegistrationTests(APITestCase):
             "email": "missingpass@example.com",
         }
 
-    def test_register_user_success(self):
+    @patch("accounts.views.send_mail")
+    def test_register_user_success(self, mock_send_mail):
         response = self.client.post(
             self.register_url, self.user_data_valid, format="json"
         )
@@ -51,6 +52,11 @@ class AccountRegistrationTests(APITestCase):
             response.data["message"],
             "Registration successful. Check your email to activate your account.",
         )
+        mock_send_mail.assert_called_once()
+        args, kwargs = mock_send_mail.call_args
+        self.assertEqual(args[0], "Account Verification")
+        self.assertIn("Click the link to activate your account:", args[1])
+        self.assertEqual(args[3], [self.user_data_valid["email"]])
 
     def test_register_user_duplicate_email(self):
         self.client.post(self.register_url, self.user_data_valid, format="json")
@@ -131,6 +137,23 @@ class AccountLoginAndUserViewTests(APITestCase):
         actual_secure_flag = bool(access_cookie.get("secure"))
         self.assertEqual(actual_secure_flag, expected_secure_flag)
         self.assertEqual(access_cookie["samesite"], "Lax")
+
+    def test_login_missing_credentials(self):
+        response = self.client.post(
+            self.login_url, {"email": self.active_user_email}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(str(response.data["detail"]), "Email and password are required.")
+
+        response = self.client.post(
+            self.login_url, {"password": self.active_user_password}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(str(response.data["detail"]), "Email and password are required.")
+
+        response = self.client.post(self.login_url, {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(str(response.data["detail"]), "Email and password are required.")
 
     def test_login_active_user_wrong_password(self):
         response = self.client.post(
@@ -242,6 +265,40 @@ class AccountLoginAndUserViewTests(APITestCase):
             "Invalid or expired refresh token" in str(response.data["detail"])
         )
 
+    def test_refresh_token_for_nonexistent_or_inactive_user(self):
+        # Część 1: Test dla użytkownika nieaktywnego
+        login_response = self.client.post(
+            self.login_url, self.login_data_active_correct, format="json"
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+
+        self.active_user.is_active = False
+        self.active_user.save()
+
+        response_inactive = self.client.post(self.refresh_token_url, format="json")
+        self.assertEqual(response_inactive.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("User account is inactive.", str(response_inactive.data["detail"]))
+
+        # Przywrócenie stanu i ponowne zalogowanie, aby mieć pewność, że mamy świeże ciasteczka
+        self.active_user.is_active = True
+        self.active_user.save()
+        self.client.post(self.login_url, self.login_data_active_correct, format="json")
+
+        # Część 2: Test dla użytkownika usuniętego
+        self.active_user.delete()
+        self.assertFalse(User.objects.filter(email=self.active_user_email).exists())
+
+        # POPRAWKA: Usuwamy access_token, aby zmusić widok do użycia logiki
+        # opartej na refresh_token i przetestować nasz blok `except User.DoesNotExist`.
+        del self.client.cookies['access_token']
+
+        response_deleted = self.client.post(self.refresh_token_url, format="json")
+        self.assertEqual(response_deleted.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Ta asercja powinna teraz przejść pomyślnie.
+        self.assertIn("User associated with refresh token not found or not active.",
+                      str(response_deleted.data["detail"]))
+
 
 class AccountVerificationTests(APITestCase):
     def setUp(self):
@@ -281,11 +338,11 @@ class AccountVerificationTests(APITestCase):
     def test_verify_email_invalid_token(self):
         invalid_token = "thisisnotavalidjwttoken"
         verification_url = (
-            reverse(self.verify_email_url_name) + f"?token={invalid_token}"
+                reverse(self.verify_email_url_name) + f"?token={invalid_token}"
         )
         with patch(
-            "accounts.views.decode_verification_token",
-            side_effect=AuthenticationFailed("Invalid token for test"),
+                "accounts.views.decode_verification_token",
+                side_effect=AuthenticationFailed("Invalid token for test"),
         ) as mock_decode:
             response = self.client.get(verification_url)
         mock_decode.assert_called_once_with(invalid_token)
@@ -345,6 +402,11 @@ class AccountPasswordResetTests(APITestCase):
         self.assertEqual(args[3], [self.user_email])
         self.assertEqual(kwargs.get("fail_silently"), False)
 
+    def test_request_password_reset_missing_email(self):
+        response = self.client.post(self.request_reset_url, {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "Email is required")
+
     def test_request_password_reset_nonexistent_email(self):
         response = self.client.post(
             self.request_reset_url, {"email": "nobody@example.com"}, format="json"
@@ -381,14 +443,24 @@ class AccountPasswordResetTests(APITestCase):
             "new_password": self.new_password,
         }
         with patch(
-            "accounts.views.decode_password_reset_token",
-            side_effect=AuthenticationFailed("Invalid token for test"),
+                "accounts.views.decode_password_reset_token",
+                side_effect=AuthenticationFailed("Invalid token for test"),
         ) as mock_decode:
             response = self.client.post(self.reset_password_url, payload, format="json")
         mock_decode.assert_called_once_with(payload["token"])
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("error", response.data)
         self.assertTrue("Invalid or expired token" in response.data["error"])
+
+    def test_reset_password_token_for_nonexistent_user(self):
+        reset_token = generate_password_reset_token(self.user.id)
+        self.user.delete()
+        self.assertFalse(User.objects.filter(email=self.user_email).exists())
+        payload = {"token": reset_token, "new_password": self.new_password}
+        response = self.client.post(self.reset_password_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", response.data)
+        self.assertEqual(response.data["error"], "User not found for token, or token is invalid.")
 
     def test_reset_password_missing_token_or_password(self):
         response_no_token = self.client.post(
