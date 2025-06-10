@@ -14,6 +14,7 @@ import {
   Globe,
   Lock,
   Eye,
+  MessageCircle,
 } from "lucide-vue-next";
 import {
   Tooltip,
@@ -21,6 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import CommentSection from "@/components/CommentSection.vue";
 
 interface ApiAudioFile {
   id: number;
@@ -36,7 +38,6 @@ interface ApiAudioFile {
   uploader: string | null;
   views: number;
 }
-
 interface AudioFile extends ApiAudioFile {}
 
 const latestAudioFiles = ref<AudioFile[]>([]);
@@ -45,13 +46,30 @@ const loadingMore = ref(false);
 const error = ref<string | null>(null);
 const page = ref(1);
 const hasMore = ref(true);
-
 const playedFiles = ref(new Set<string>());
+const activeCommentSection = ref<string | null>(null);
 
 const { $api } = useNuxtApp();
 const { isAuthenticated } = useAuth();
 
 const isFocused = useWindowFocus();
+
+// --- MODIFIED FUNCTION ---
+const toggleCommentSection = (uuid: string) => {
+  // First, check if the user is logged in.
+  if (!isAuthenticated.value) {
+    // If not, redirect to the login page and stop.
+    navigateTo("/login");
+    return;
+  }
+
+  // If they are logged in, proceed with the original toggle logic.
+  if (activeCommentSection.value === uuid) {
+    activeCommentSection.value = null; // Close if already open
+  } else {
+    activeCommentSection.value = uuid; // Open new one
+  }
+};
 
 watch(isFocused, (isNowFocused) => {
   if (isNowFocused && !loading.value) {
@@ -59,13 +77,13 @@ watch(isFocused, (isNowFocused) => {
     page.value = 1;
     hasMore.value = true;
     playedFiles.value.clear();
+    activeCommentSection.value = null;
     fetchAudioFiles();
   }
 });
 
 const fetchAudioFiles = async () => {
   if (!hasMore.value) return;
-
   if (page.value === 1) {
     loading.value = true;
   } else {
@@ -73,7 +91,6 @@ const fetchAudioFiles = async () => {
   }
   error.value = null;
   const config = useRuntimeConfig();
-
   try {
     const response = await $api.get<{
       results: ApiAudioFile[];
@@ -84,7 +101,6 @@ const fetchAudioFiles = async () => {
       const fullFileUrl = new URL(file.file, config.public.mediaRoot).href;
       return { ...file, file: fullFileUrl };
     });
-
     latestAudioFiles.value.push(...newFiles);
     hasMore.value = data.has_more;
     page.value++;
@@ -96,11 +112,9 @@ const fetchAudioFiles = async () => {
     loadingMore.value = false;
   }
 };
-
 onMounted(() => {
   fetchAudioFiles();
 });
-
 const handleVote = async (
   file: AudioFile,
   voteType: "like" | "dislike"
@@ -134,14 +148,11 @@ const handleVote = async (
     file.dislikes_count = originalDislikes;
   }
 };
-
 const handlePlay = async (file: AudioFile) => {
   if (playedFiles.value.has(file.uuid)) {
     return;
   }
-
   playedFiles.value.add(file.uuid);
-
   try {
     const response = await $api.get<AudioFile>(`/api/audio/${file.uuid}/`);
     file.views = response.data.views;
@@ -150,7 +161,6 @@ const handlePlay = async (file: AudioFile) => {
     playedFiles.value.delete(file.uuid);
   }
 };
-
 const formatDate = (dateString: string) => {
   const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
@@ -163,7 +173,7 @@ const formatDate = (dateString: string) => {
 
 <template>
   <div>
-    <h2 class="text-2xl font-bold mb-4">Latest</h2>
+    <h2 class="text-2xl font-bold mb-4">Przeglądaj pliki!</h2>
     <div v-if="loading" class="text-center">Wczytywanie...</div>
     <div v-else-if="error" class="text-center text-red-500">
       Error : {{ error }}
@@ -195,7 +205,6 @@ const formatDate = (dateString: string) => {
                 </Tooltip>
               </TooltipProvider>
             </div>
-
             <CardDescription class="mb-2 mt-1 text-sm">
               Author: {{ audioFile.uploader || "Anonim" }}
             </CardDescription>
@@ -217,55 +226,73 @@ const formatDate = (dateString: string) => {
               Your browser does not support the audio element.
             </audio>
             <div
-              class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-start space-x-6"
+              class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-start"
             >
-              <div class="flex items-center space-x-1">
+              <div class="flex items-center space-x-6">
+                <div class="flex items-center space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    @click="handleVote(audioFile, 'like')"
+                    :class="{ 'text-blue-500': audioFile.user_vote === 'like' }"
+                    aria-label="Like"
+                  >
+                    <ThumbsUp
+                      class="h-5 w-5"
+                      :class="{
+                        'fill-blue-500 dark:fill-blue-700 opacity-50':
+                          audioFile.user_vote === 'like',
+                      }"
+                    />
+                  </Button>
+                  <span class="text-sm min-w-[20px] text-center">{{
+                    audioFile.likes_count
+                  }}</span>
+                </div>
+                <div class="flex items-center space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    @click="handleVote(audioFile, 'dislike')"
+                    :class="{
+                      'text-red-500': audioFile.user_vote === 'dislike',
+                    }"
+                    aria-label="Dislike"
+                  >
+                    <ThumbsDown
+                      class="h-5 w-5"
+                      :class="{
+                        'fill-red-500 dark:fill-red-700 opacity-50':
+                          audioFile.user_vote === 'dislike',
+                      }"
+                    />
+                  </Button>
+                  <span class="text-sm min-w-[20px] text-center">{{
+                    audioFile.dislikes_count
+                  }}</span>
+                </div>
+                <div class="flex items-center space-x-1 text-gray-500">
+                  <Eye class="h-5 w-5" />
+                  <span class="text-sm min-w-[20px] text-center">{{
+                    audioFile.views
+                  }}</span>
+                </div>
+              </div>
+              <div class="flex-grow flex justify-end">
                 <Button
                   variant="ghost"
                   size="icon"
-                  @click="handleVote(audioFile, 'like')"
-                  :class="{ 'text-blue-500': audioFile.user_vote === 'like' }"
-                  aria-label="Like"
+                  @click="toggleCommentSection(audioFile.uuid)"
+                  aria-label="Toggle Comments"
                 >
-                  <ThumbsUp
-                    class="h-5 w-5"
-                    :class="{
-                      'fill-blue-500 dark:fill-blue-700 opacity-50':
-                        audioFile.user_vote === 'like',
-                    }"
-                  />
+                  <MessageCircle class="h-5 w-5" />
                 </Button>
-                <span class="text-sm min-w-[20px] text-center">{{
-                  audioFile.likes_count
-                }}</span>
-              </div>
-              <div class="flex items-center space-x-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  @click="handleVote(audioFile, 'dislike')"
-                  :class="{ 'text-red-500': audioFile.user_vote === 'dislike' }"
-                  aria-label="Dislike"
-                >
-                  <ThumbsDown
-                    class="h-5 w-5"
-                    :class="{
-                      'fill-red-500 dark:fill-red-700 opacity-50':
-                        audioFile.user_vote === 'dislike',
-                    }"
-                  />
-                </Button>
-                <span class="text-sm min-w-[20px] text-center">{{
-                  audioFile.dislikes_count
-                }}</span>
-              </div>
-              <div class="flex items-center space-x-1 text-gray-500">
-                <Eye class="h-5 w-5" />
-                <span class="text-sm min-w-[20px] text-center">{{
-                  audioFile.views
-                }}</span>
               </div>
             </div>
+            <CommentSection
+              v-if="activeCommentSection === audioFile.uuid"
+              :audio-file-uuid="audioFile.uuid"
+            />
           </CardContent>
         </Card>
       </div>
