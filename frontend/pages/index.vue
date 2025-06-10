@@ -8,14 +8,19 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ThumbsUp, ThumbsDown, Globe, Lock } from "lucide-vue-next"; 
+import {
+  ThumbsUp,
+  ThumbsDown,
+  Globe,
+  Lock,
+  Eye,
+} from "lucide-vue-next";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
 
 interface ApiAudioFile {
   id: number;
@@ -28,7 +33,8 @@ interface ApiAudioFile {
   likes_count: number;
   dislikes_count: number;
   user_vote: "like" | "dislike" | null;
-  uploader: string | null; 
+  uploader: string | null;
+  views: number;
 }
 
 interface AudioFile extends ApiAudioFile {}
@@ -40,6 +46,8 @@ const error = ref<string | null>(null);
 const page = ref(1);
 const hasMore = ref(true);
 
+const playedFiles = ref(new Set<string>());
+
 const { $api } = useNuxtApp();
 const { isAuthenticated } = useAuth();
 
@@ -50,12 +58,12 @@ watch(isFocused, (isNowFocused) => {
     latestAudioFiles.value = [];
     page.value = 1;
     hasMore.value = true;
+    playedFiles.value.clear();
     fetchAudioFiles();
   }
 });
 
 const fetchAudioFiles = async () => {
-
   if (!hasMore.value) return;
 
   if (page.value === 1) {
@@ -65,12 +73,12 @@ const fetchAudioFiles = async () => {
   }
   error.value = null;
   const config = useRuntimeConfig();
-  const apiRoot = config.public.apiRoot;
 
   try {
-    const response = await $api.get<PaginatedResponse>(
-      `/api/audio/latest/?page=${page.value}`
-    );
+    const response = await $api.get<{
+      results: ApiAudioFile[];
+      has_more: boolean;
+    }>(`/api/audio/latest/?page=${page.value}`);
     const data = response.data;
     const newFiles = data.results.map((file) => {
       const fullFileUrl = new URL(file.file, config.public.mediaRoot).href;
@@ -89,7 +97,6 @@ const fetchAudioFiles = async () => {
   }
 };
 
-// This still correctly triggers the very first fetch.
 onMounted(() => {
   fetchAudioFiles();
 });
@@ -127,6 +134,23 @@ const handleVote = async (
     file.dislikes_count = originalDislikes;
   }
 };
+
+const handlePlay = async (file: AudioFile) => {
+  if (playedFiles.value.has(file.uuid)) {
+    return;
+  }
+
+  playedFiles.value.add(file.uuid);
+
+  try {
+    const response = await $api.get<AudioFile>(`/api/audio/${file.uuid}/`);
+    file.views = response.data.views;
+  } catch (err) {
+    console.error("Failed to increment view count:", err);
+    playedFiles.value.delete(file.uuid);
+  }
+};
+
 const formatDate = (dateString: string) => {
   const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
@@ -154,11 +178,8 @@ const formatDate = (dateString: string) => {
       <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card v-for="audioFile in latestAudioFiles" :key="audioFile.id">
           <CardContent class="p-6">
-            <!-- --- 2. WRAP TITLE AND ICON IN A FLEX CONTAINER --- -->
             <div class="flex justify-between items-start gap-2">
               <CardTitle>{{ audioFile.title }}</CardTitle>
-
-              <!-- --- 3. ADD THE TOOLTIP AND CONDITIONAL ICONS --- -->
               <TooltipProvider :delay-duration="100">
                 <Tooltip>
                   <TooltipTrigger>
@@ -166,7 +187,7 @@ const formatDate = (dateString: string) => {
                       v-if="audioFile.is_public"
                       class="h-5 w-5 text-gray-500"
                     />
-                    <GlobeOff v-else class="h-5 w-5 text-gray-500" />
+                    <Lock v-else class="h-5 w-5 text-gray-500" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{{ audioFile.is_public ? "Public" : "Private" }}</p>
@@ -176,9 +197,8 @@ const formatDate = (dateString: string) => {
             </div>
 
             <CardDescription class="mb-2 mt-1 text-sm">
-            Author: {{ audioFile.uploader || "Anonim" }}
-          </CardDescription>
-
+              Author: {{ audioFile.uploader || "Anonim" }}
+            </CardDescription>
             <CardDescription class="mb-2 mt-1">
               Opublikowane: {{ formatDate(audioFile.uploaded_at) }}
             </CardDescription>
@@ -188,13 +208,17 @@ const formatDate = (dateString: string) => {
             <CardDescription v-else class="mb-2 text-sm text-gray-500">
               Opis: Brak opisu
             </CardDescription>
-            <audio controls :src="audioFile.file" class="w-full mt-4">
+            <audio
+              controls
+              :src="audioFile.file"
+              class="w-full mt-4"
+              @play="handlePlay(audioFile)"
+            >
               Your browser does not support the audio element.
             </audio>
             <div
               class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-start space-x-6"
             >
-              <!-- Like/Dislike buttons remain the same -->
               <div class="flex items-center space-x-1">
                 <Button
                   variant="ghost"
@@ -235,11 +259,16 @@ const formatDate = (dateString: string) => {
                   audioFile.dislikes_count
                 }}</span>
               </div>
+              <div class="flex items-center space-x-1 text-gray-500">
+                <Eye class="h-5 w-5" />
+                <span class="text-sm min-w-[20px] text-center">{{
+                  audioFile.views
+                }}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
-      <!-- "Load More" section remains the same -->
       <div class="mt-8 text-center">
         <Button
           v-if="hasMore && !loadingMore"
