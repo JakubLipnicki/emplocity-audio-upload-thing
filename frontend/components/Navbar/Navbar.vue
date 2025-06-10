@@ -21,7 +21,7 @@
 
       <div>
         <!-- Authenticated State: Link to user's profile -->
-        <NuxtLink v-if="isAuthenticated && user" :to="`/profile/${user.name}`">
+        <NuxtLink v-if="isAuthenticated && user" :to="`/profile`">
           <User class="h-6 w-6 text-gray-700 hover:text-blue-600" />
         </NuxtLink>
         <!-- Unauthenticated State: Link to login page -->
