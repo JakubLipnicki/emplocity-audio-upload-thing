@@ -3,13 +3,14 @@ import { ref, onMounted } from "vue";
 import { useAuth } from "@/composables/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const props = defineProps<{
   audioFileUuid: string;
 }>();
 
 interface User {
+  id: number;
   name: string;
 }
 
@@ -31,6 +32,7 @@ const newCommentContent = ref("");
 const newReplyContent = ref("");
 const replyingTo = ref<string | null>(null);
 const isSubmitting = ref(false);
+const confirmingDeleteId = ref<string | null>(null);
 
 const { $api } = useNuxtApp();
 const { isAuthenticated, user } = useAuth();
@@ -98,6 +100,33 @@ const postReply = async (parentComment: Comment) => {
   }
 };
 
+const deleteComment = async (commentId: string) => {
+  try {
+    await $api.delete(`/api/comments/${commentId}/`);
+    const index = comments.value.findIndex((c) => c.id === commentId);
+    if (index !== -1) {
+      comments.value.splice(index, 1);
+    } else {
+      for (const comment of comments.value) {
+        if (comment.replies) {
+          const replyIndex = comment.replies.findIndex(
+            (r) => r.id === commentId
+          );
+          if (replyIndex !== -1) {
+            comment.replies.splice(replyIndex, 1);
+            break;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to delete comment:", err);
+    alert("Nie udało się usunąć komentarza.");
+  } finally {
+    confirmingDeleteId.value = null;
+  }
+};
+
 const showReplyForm = (commentId: string) => {
   replyingTo.value = commentId;
   newReplyContent.value = "";
@@ -153,14 +182,45 @@ const formatDate = (dateString: string) => {
           <p class="mt-1 text-gray-800 dark:text-gray-300">
             {{ comment.content }}
           </p>
-          <Button
-            v-if="isAuthenticated"
-            variant="link"
-            class="p-0 h-auto text-xs mt-1"
-            @click="showReplyForm(comment.id)"
-          >
-            Odpowiedz
-          </Button>
+          <div class="flex items-center gap-4 mt-1">
+            <Button
+              v-if="isAuthenticated"
+              variant="link"
+              class="p-0 h-auto text-xs"
+              @click="showReplyForm(comment.id)"
+            >
+              Odpowiedz
+            </Button>
+            <div v-if="isAuthenticated && comment.user.id === user?.id">
+              <div v-if="confirmingDeleteId !== comment.id">
+                <Button
+                  variant="link"
+                  class="p-0 h-auto text-xs text-red-600 hover:text-red-500"
+                  @click="confirmingDeleteId = comment.id"
+                >
+                  Usuń
+                </Button>
+              </div>
+              <div v-else class="flex items-center gap-2">
+                <span class="text-sm">Na pewno?</span>
+                <Button
+                  variant="link"
+                  class="p-0 h-auto text-xs text-red-600"
+                  @click="deleteComment(comment.id)"
+                >
+                  Tak
+                </Button>
+                <Button
+                  variant="link"
+                  class="p-0 h-auto text-xs"
+                  @click="confirmingDeleteId = null"
+                >
+                  Anuluj
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <div v-if="replyingTo === comment.id" class="flex items-start gap-4 mt-4">
             <Avatar class="w-8 h-8">
               <AvatarFallback>{{ getAvatarFallback(user?.name) }}</AvatarFallback>
@@ -207,6 +267,34 @@ const formatDate = (dateString: string) => {
                 <p class="mt-1 text-gray-800 dark:text-gray-300">
                   {{ reply.content }}
                 </p>
+                <div v-if="isAuthenticated && reply.user.id === user?.id" class="mt-1">
+                  <div v-if="confirmingDeleteId !== reply.id">
+                    <Button
+                      variant="link"
+                      class="p-0 h-auto text-xs text-red-600 hover:text-red-500"
+                      @click="confirmingDeleteId = reply.id"
+                    >
+                      Usuń
+                    </Button>
+                  </div>
+                  <div v-else class="flex items-center gap-2">
+                    <span class="text-sm">Na pewno?</span>
+                    <Button
+                      variant="link"
+                      class="p-0 h-auto text-xs text-red-600"
+                      @click="deleteComment(reply.id)"
+                    >
+                      Tak
+                    </Button>
+                    <Button
+                      variant="link"
+                      class="p-0 h-auto text-xs"
+                      @click="confirmingDeleteId = null"
+                    >
+                      Anuluj
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

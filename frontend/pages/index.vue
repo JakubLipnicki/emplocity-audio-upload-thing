@@ -206,7 +206,7 @@ const formatDate = (dateString: string) => {
               </TooltipProvider>
             </div>
             <CardDescription class="mb-2 mt-1 text-sm">
-              Author: {{ audioFile.uploader || "Anonim" }}
+              Autor: {{ audioFile.uploader || "Anonim" }}
             </CardDescription>
             <CardDescription class="mb-2 mt-1">
               Opublikowane: {{ formatDate(audioFile.uploaded_at) }}
