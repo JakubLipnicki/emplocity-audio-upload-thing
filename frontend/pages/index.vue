@@ -8,8 +8,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-// --- 1. FIX THE ICON IMPORT ---
-import { ThumbsUp, ThumbsDown, Globe, Lock } from "lucide-vue-next"; // Replaced GlobeOff with Lock
+import { ThumbsUp, ThumbsDown, Globe, Lock } from "lucide-vue-next"; 
 import {
   Tooltip,
   TooltipContent,
@@ -17,7 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// --- Interfaces (no changes) ---
+
 interface ApiAudioFile {
   id: number;
   uuid: string;
@@ -29,12 +28,11 @@ interface ApiAudioFile {
   likes_count: number;
   dislikes_count: number;
   user_vote: "like" | "dislike" | null;
-  uploader: string | null; // Add the uploader field
+  uploader: string | null; 
 }
-// ... other interfaces ...
+
 interface AudioFile extends ApiAudioFile {}
 
-// --- All other <script setup> logic remains exactly the same ---
 const latestAudioFiles = ref<AudioFile[]>([]);
 const loading = ref(true);
 const loadingMore = ref(false);
@@ -47,12 +45,8 @@ const { isAuthenticated } = useAuth();
 
 const isFocused = useWindowFocus();
 
-// We watch the focus state.
 watch(isFocused, (isNowFocused) => {
-  // We only act if the window becomes focused AND it's not the initial load.
-  // The `!loading.value` check prevents this from running on the first load.
   if (isNowFocused && !loading.value) {
-    // Reset state to fetch the latest data from the beginning
     latestAudioFiles.value = [];
     page.value = 1;
     hasMore.value = true;
@@ -61,13 +55,9 @@ watch(isFocused, (isNowFocused) => {
 });
 
 const fetchAudioFiles = async () => {
-  // --- THIS IS THE FIX: REMOVE THE FAULTY GUARD CONDITION ---
-  // The line `if (loading.value || loadingMore.value) return;` has been removed.
 
-  // This guard is still useful to prevent fetching beyond the last page.
   if (!hasMore.value) return;
 
-  // Set the correct loading state
   if (page.value === 1) {
     loading.value = true;
   } else {
@@ -83,7 +73,7 @@ const fetchAudioFiles = async () => {
     );
     const data = response.data;
     const newFiles = data.results.map((file) => {
-      const fullFileUrl = new URL(file.file, apiRoot).href;
+      const fullFileUrl = new URL(file.file, config.public.mediaRoot).href;
       return { ...file, file: fullFileUrl };
     });
 
@@ -94,7 +84,6 @@ const fetchAudioFiles = async () => {
     error.value = `Error fetching audio files: ${e.message}`;
     console.error("Fetch error:", e);
   } finally {
-    // This block will now be reached correctly on the initial load.
     loading.value = false;
     loadingMore.value = false;
   }
