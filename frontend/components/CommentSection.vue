@@ -24,7 +24,6 @@ interface Reply {
 interface Comment extends Reply {
   replies: Reply[];
 }
-
 const comments = ref<Comment[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
