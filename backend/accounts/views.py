@@ -7,8 +7,10 @@ from decouple import config
 from django.conf import settings
 from django.core.mail import send_mail
 from django.shortcuts import redirect
+from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny  # Dodano IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -24,19 +26,14 @@ from .utils import (
     generate_verification_token,
 )
 
-SECRET_KEY = config("SECRET_KEY")
-EMAIL_HOST_USER = config("EMAIL_HOST_USER")
-
 
 class RegisterView(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-
         token = generate_verification_token(user.id)
         verify_link = f"{settings.BASE_URL}/api/verify-email/?token={token}"
-
         send_mail(
             "Account Verification",
             f"Click the link to activate your account: {verify_link}",
@@ -44,107 +41,95 @@ class RegisterView(APIView):
             [user.email],
             fail_silently=False,
         )
-
         return Response(
             {
                 "message": "Registration successful. Check your email to activate your account."
-            }
+            },
+            status=status.HTTP_201_CREATED,
         )
 
 
 class VerifyEmailView(APIView):
     def get(self, request):
         token = request.GET.get("token")
-        frontend_redirect_url = "http://localhost:3000/activation"
-
+        frontend_redirect_url = f"{settings.FRONTEND_URL.rstrip('/')}/activation"
         if not token:
             return redirect(frontend_redirect_url)
-
-        user_id = decode_verification_token(token)
-        if not user_id:
-            return redirect(frontend_redirect_url)
-
+        try:
+            user_id = decode_verification_token(token)
+        except AuthenticationFailed:
+            return redirect(f"{frontend_redirect_url}?error=invalid_token")
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return redirect(frontend_redirect_url)
-
+            return redirect(f"{frontend_redirect_url}?error=user_not_found")
         if not user.is_active:
             user.is_active = True
             user.save(update_fields=["is_active"])
-
-        return redirect(frontend_redirect_url)
+            return redirect(f"{frontend_redirect_url}?success=true")
+        return redirect(f"{frontend_redirect_url}?already_active=true")
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class LoginView(APIView):
     def post(self, request):
-        email = request.data["email"]
-        password = request.data["password"]
-
+        email = request.data.get("email")
+        password = request.data.get("password")
+        if not email or not password:
+            raise AuthenticationFailed("Email and password are required.")
         user = User.objects.filter(email=email).first()
-
         if user is None:
             raise AuthenticationFailed("User not found!")
-
         if not user.check_password(password):
             raise AuthenticationFailed("Incorrect password!")
-
         if not user.is_active:
             raise AuthenticationFailed(
                 "Account not activated. Please check your email."
             )
-
         access_token = generate_access_token(user.id)
         refresh_token = generate_refresh_token(user.id)
-
         response = Response()
-
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=True,
+            secure=settings.SESSION_COOKIE_SECURE,
             samesite="Lax",
-            max_age=15 * 60,
+            max_age=settings.ACCESS_TOKEN_EXPIRATION_TIME_HOURS * 60 * 60,
         )
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,
+            secure=settings.SESSION_COOKIE_SECURE,
             samesite="Lax",
-            max_age=7 * 24 * 60 * 60,
+            max_age=settings.REFRESH_TOKEN_EXPIRATION_TIME_DAYS * 24 * 60 * 60,
         )
-
         response.data = {"message": "Logged in successfully"}
-
+        response.status_code = status.HTTP_200_OK
         return response
 
 
 class UserView(APIView):
+    permission_classes = [
+        IsAuthenticated
+    ]  # Requires user to be authenticated to access this view.
+
+    # JWTAuthentication (default) will handle checking token from header or cookie.
     def get(self, request):
-        token = request.COOKIES.get("access_token")
-
-        if not token:
-            raise AuthenticationFailed("Unauthenticated")
-
-        try:
-            payload = decode_token(token, expected_type="access")
-        except AuthenticationFailed:
-            raise AuthenticationFailed("Unauthenticated")
-
-        user = User.objects.filter(id=payload["user_id"]).first()
-        serializer = UserSerializer(user)
-
+        # If execution reaches here, request.user is an authenticated User instance.
+        serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
 
 class LogoutView(APIView):
-    def post(self, request):
+    def post(
+        self, request
+    ):  # Should ideally require authentication to logout a specific session
         response = Response()
-        response.delete_cookie("access_token")
-        response.delete_cookie("refresh_token")
-        response.data = {"message": "Success"}
+        response.delete_cookie("access_token", samesite="Lax")
+        response.delete_cookie("refresh_token", samesite="Lax")
+        response.data = {"message": "Successfully logged out."}
+        response.status_code = status.HTTP_200_OK
         return response
 
 
@@ -154,34 +139,25 @@ class RequestPasswordResetView(APIView):
     def post(self, request):
         email = request.data.get("email")
         if not email:
-            return Response({"error": "Email is required"}, status=400)
-
+            return Response(
+                {"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
         user = User.objects.filter(email=email).first()
-        if not user:
-            return Response(
-                {"error": "Something went wrong, please try again"}, status=404
+        if user and user.is_active:
+            token = generate_password_reset_token(user.id)
+            reset_link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password-confirm/?token={token}"
+            send_mail(
+                "Password Reset Request",
+                f"Click the link to reset your password: {reset_link}",
+                settings.EMAIL_HOST_USER,
+                [user.email],
+                fail_silently=False,
             )
-
-        if not user.is_active:
-            return Response(
-                {
-                    "error": "Account has not been activated, please try again after activation"
-                },
-                status=400,
-            )
-
-        token = generate_password_reset_token(user.id)
-        reset_link = f"{settings.BASE_URL}/reset-password/?token={token}"
-
-        send_mail(
-            "Password Reset Request",
-            f"Click the link to reset your password: {reset_link}",
-            EMAIL_HOST_USER,
-            [user.email],
-            fail_silently=False,
+        return Response(
+            {
+                "message": "If an account with this email exists and is active, a password reset link has been sent."
+            }
         )
-
-        return Response({"message": "Password reset link has been sent to your email"})
 
 
 class ResetPasswordView(APIView):
@@ -190,52 +166,55 @@ class ResetPasswordView(APIView):
     def post(self, request):
         token = request.data.get("token")
         new_password = request.data.get("new_password")
-
         if not token or not new_password:
             return Response(
-                {"error": "Token and new password are required"}, status=400
+                {"error": "Token and new password are required"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-
-        user_id = decode_password_reset_token(token)
-        if not user_id:
-            return Response({"error": "Invalid or expired token"}, status=400)
-
-        user = User.objects.filter(id=user_id).first()
-        if not user:
-            return Response({"error": "User not found"}, status=404)
-
+        try:
+            user_id = decode_password_reset_token(token)
+        except AuthenticationFailed as e:
+            return Response(
+                {"error": f"Invalid or expired token: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found for token, or token is invalid."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         user.set_password(new_password)
         user.save(update_fields=["password"])
-
         return Response({"message": "Password has been reset successfully."})
 
 
 class RefreshTokenView(APIView):
     def post(self, request):
         refresh_token = request.COOKIES.get("refresh_token")
-
         if not refresh_token:
-            raise AuthenticationFailed("Refresh token not found")
-
+            raise AuthenticationFailed("Refresh token not found in cookies.")
         try:
             payload = decode_token(refresh_token, expected_type="refresh")
-        except AuthenticationFailed:
-            raise AuthenticationFailed("Invalid or expired refresh token")
-
-        user_id = payload["user_id"]
-
-        access_token = generate_access_token(user_id)
+            user_id = payload["user_id"]
+            user = User.objects.get(id=user_id, is_active=True)
+        except AuthenticationFailed as e:
+            raise AuthenticationFailed(f"Invalid or expired refresh token: {str(e)}")
+        except User.DoesNotExist:
+            raise AuthenticationFailed(
+                "User associated with refresh token not found or not active."
+            )
+        access_token = generate_access_token(user.id)
         response = Response()
-
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=True,
+            secure=settings.SESSION_COOKIE_SECURE,
             samesite="Lax",
-            max_age=15 * 60,
+            max_age=settings.ACCESS_TOKEN_EXPIRATION_TIME_HOURS * 60 * 60,
         )
-
         response.data = {"message": "Access token refreshed successfully"}
-
+        response.status_code = status.HTTP_200_OK
         return response

@@ -1,14 +1,14 @@
-from accounts.authentication import JWTAuthentication
-from django.db.models import Q, Count, F, FloatField, ExpressionWrapper, Value
+from django.db.models import Count, ExpressionWrapper, F, FloatField, Q, Value
 from rest_framework import generics, permissions
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.authentication import JWTAuthentication
+
 from .models import AudioFile, Like, Tag
 from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
-
 
 
 class AudioFileUploadView(generics.ListCreateAPIView):
@@ -45,15 +45,17 @@ class LatestAudioFilesView(APIView):
         page_size = 10
         offset = (page - 1) * page_size
         queryset = AudioFile.objects.filter(is_public=True).order_by("-uploaded_at")
-        results = list(queryset[offset:offset + page_size])
+        results = list(queryset[offset : offset + page_size])
         serializer = AudioFileSerializer(results, many=True)
 
         has_more = queryset.count() > offset + page_size
-        return Response({
-            "results": serializer.data,
-            "has_more": has_more,
-            "page": page,
-        })
+        return Response(
+            {
+                "results": serializer.data,
+                "has_more": has_more,
+                "page": page,
+            }
+        )
 
 
 class AudioFileDetailByUUIDView(generics.RetrieveAPIView):
@@ -141,6 +143,7 @@ class AudioFileLikesCountView(APIView):
             }
         )
 
+
 class TopRatedAudioFilesView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -162,6 +165,7 @@ class TopRatedAudioFilesView(APIView):
 
         serializer = AudioFileSerializer(queryset, many=True)
         return Response(serializer.data)
+
 
 class TagListView(generics.ListAPIView):
     queryset = Tag.objects.all()
