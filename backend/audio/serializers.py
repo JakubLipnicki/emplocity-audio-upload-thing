@@ -1,3 +1,5 @@
+# audio/serializers.py
+
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -18,6 +20,8 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class AudioFileSerializer(serializers.ModelSerializer):
+    is_public = serializers.BooleanField(required=False, default=True)
+
     tags = serializers.ListField(
         child=serializers.CharField(), required=False, write_only=True
     )
@@ -58,13 +62,13 @@ class AudioFileSerializer(serializers.ModelSerializer):
         return obj.likes.filter(is_liked=False).count()
 
     def get_uploader(self, obj):
-        # return obj.user.username if obj.user else "Anonim"
         return obj.user.name if obj.user else "Anonim"
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["file"] = urljoin(settings.AUDIO_FILE_BASE_URL + "/", instance.file.name)
         rep["tags"] = [tag.name for tag in instance.tags.all()]
+        rep["uuid"] = str(instance.uuid)
         return rep
 
 
