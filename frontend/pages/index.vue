@@ -15,6 +15,7 @@ import {
   Lock,
   Eye,
   MessageCircle,
+  X,
 } from "lucide-vue-next";
 import {
   Tooltip,
@@ -37,10 +38,13 @@ interface ApiAudioFile {
   user_vote: "like" | "dislike" | null;
   uploader: string | null;
   views: number;
-  // --- NEW: ADD TAGS PROPERTY ---
   tags: string[];
 }
 interface AudioFile extends ApiAudioFile {}
+interface ApiTag {
+  id: number;
+  name: string;
+}
 
 const latestAudioFiles = ref<AudioFile[]>([]);
 const loading = ref(true);
@@ -50,6 +54,9 @@ const page = ref(1);
 const hasMore = ref(true);
 const playedFiles = ref(new Set<string>());
 const activeCommentSection = ref<string | null>(null);
+const activeTags = ref<string[]>([]);
+const allTags = ref<string[]>([]);
+const tagsLoading = ref(true);
 
 const { $api } = useNuxtApp();
 const { isAuthenticated } = useAuth();
@@ -68,14 +75,36 @@ const toggleCommentSection = (uuid: string) => {
   }
 };
 
+const handleTagClick = (tag: string) => {
+  const tagIndex = activeTags.value.indexOf(tag);
+  if (tagIndex > -1) {
+    activeTags.value.splice(tagIndex, 1);
+  } else {
+    activeTags.value.push(tag);
+  }
+  resetAndFetch();
+};
+
+const clearAllTags = () => {
+  if (activeTags.value.length > 0) {
+    activeTags.value = [];
+    resetAndFetch();
+  }
+};
+
+const resetAndFetch = () => {
+  latestAudioFiles.value = [];
+  page.value = 1;
+  hasMore.value = true;
+  playedFiles.value.clear();
+  activeCommentSection.value = null;
+  fetchAudioFiles();
+};
+
 watch(isFocused, (isNowFocused) => {
   if (isNowFocused && !loading.value) {
-    latestAudioFiles.value = [];
-    page.value = 1;
-    hasMore.value = true;
-    playedFiles.value.clear();
-    activeCommentSection.value = null;
-    fetchAudioFiles();
+    activeTags.value = [];
+    resetAndFetch();
   }
 });
 
@@ -88,11 +117,21 @@ const fetchAudioFiles = async () => {
   }
   error.value = null;
   const config = useRuntimeConfig();
+
+  const params = new URLSearchParams();
+  params.append("page", page.value.toString());
+  activeTags.value.forEach((tag) => {
+    params.append("tags", tag);
+  });
+
+  const endpoint = `/api/audio/latest/?${params.toString()}`;
+
   try {
     const response = await $api.get<{
       results: ApiAudioFile[];
       has_more: boolean;
-    }>(`/api/audio/latest/?page=${page.value}`);
+    }>(endpoint);
+
     const data = response.data;
     const newFiles = data.results.map((file) => {
       const fullFileUrl = new URL(file.file, config.public.mediaRoot).href;
@@ -109,9 +148,28 @@ const fetchAudioFiles = async () => {
     loadingMore.value = false;
   }
 };
+
+
+const fetchAllTags = async () => {
+  tagsLoading.value = true;
+  try {
+    const response = await $api.get<ApiTag[]>("/api/audio/tags/");
+
+    allTags.value = response.data.map((tag) => tag.name);
+  } catch (e) {
+    console.error("Failed to fetch all tags:", e);
+
+  } finally {
+    tagsLoading.value = false;
+  }
+};
+
 onMounted(() => {
+
   fetchAudioFiles();
+  fetchAllTags();
 });
+
 const handleVote = async (
   file: AudioFile,
   voteType: "like" | "dislike"
@@ -170,7 +228,47 @@ const formatDate = (dateString: string) => {
 
 <template>
   <div>
-    <h2 class="text-2xl font-bold mb-4">Przeglądaj pliki!</h2>
+
+    <h2 class="text-2xl font-bold mb-4 text-center">Przeglądaj pliki!</h2>
+
+    <div v-if="tagsLoading" class="text-center text-gray-500 my-4">
+      Wczytywanie tagów...
+    </div>
+    <div
+      v-else-if="allTags.length > 0"
+      class="mb-6 flex flex-wrap justify-center gap-2 border-b pb-6"
+    >
+      <Button
+        v-for="tag in allTags"
+        :key="tag"
+        :variant="activeTags.includes(tag) ? 'default' : 'outline'"
+        size="sm"
+        @click="handleTagClick(tag)"
+      >
+        {{ tag }}
+      </Button>
+    </div>
+
+    <div
+      v-if="activeTags.length > 0 && !loading"
+      class="mb-4 flex items-center justify-between gap-4 p-3 bg-muted rounded-lg"
+    >
+      <div class="flex items-center gap-2 flex-wrap">
+        <p class="text-sm text-muted-foreground">Filtrowanie po tagach:</p>
+        <div
+          v-for="tag in activeTags"
+          :key="tag"
+          class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground"
+        >
+          {{ tag }}
+        </div>
+      </div>
+      <Button variant="ghost" size="sm" @click="clearAllTags">
+        <X class="h-4 w-4 mr-2" />
+        Wyczyść filtry
+      </Button>
+    </div>
+
     <div v-if="loading" class="text-center">Wczytywanie...</div>
     <div v-else-if="error" class="text-center text-red-500">
       Error : {{ error }}
@@ -215,7 +313,6 @@ const formatDate = (dateString: string) => {
               Opis: Brak opisu
             </CardDescription>
 
-            <!-- --- NEW: TAGS SECTION --- -->
             <div
               v-if="audioFile.tags && audioFile.tags.length > 0"
               class="my-3 flex flex-wrap gap-2"
@@ -223,15 +320,14 @@ const formatDate = (dateString: string) => {
               <Button
                 v-for="tag in audioFile.tags"
                 :key="tag"
-                variant="outline"
+                :variant="activeTags.includes(tag) ? 'default' : 'outline'"
                 size="sm"
-                class="h-7 cursor-default"
-                @click.prevent
+                class="h-7 cursor-pointer"
+                @click="handleTagClick(tag)"
               >
                 {{ tag }}
               </Button>
             </div>
-            <!-- --- END: TAGS SECTION --- -->
 
             <audio
               controls

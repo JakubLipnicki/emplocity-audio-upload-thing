@@ -11,18 +11,16 @@ from .models import AudioFile, Like, Tag
 from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
 
 
-class AudioFileUploadView(generics.CreateAPIView): # Changed to CreateAPIView
+class AudioFileUploadView(generics.CreateAPIView): 
     
     serializer_class = AudioFileSerializer
-    permission_classes = [permissions.AllowAny] # Allows anonymous or registered uploads
+    permission_classes = [permissions.AllowAny] 
     authentication_classes = [JWTAuthentication]
     parser_classes = [MultiPartParser, FormParser]
 
     def perform_create(self, serializer):
         
         user = self.request.user if self.request.user.is_authenticated else None
-        # Let the serializer handle all fields from the request data.
-        # We only need to inject the user if they are authenticated.
         serializer.save(user=user)
 
 
@@ -31,18 +29,29 @@ class LatestAudioFilesView(APIView):
 
     def get(self, request):
         page = int(request.query_params.get("page", 1))
+        tags_to_filter = request.query_params.getlist("tags") 
         page_size = 10
         offset = (page - 1) * page_size
-        queryset = AudioFile.objects.filter(is_public=True).order_by("-uploaded_at")
-        results = list(queryset[offset: offset + page_size])
-        serializer = AudioFileSerializer(results, many=True)
 
-        has_more = queryset.count() > offset + page_size
+        queryset = AudioFile.objects.filter(is_public=True)
+
+        if tags_to_filter:
+            for tag_name in tags_to_filter:
+                queryset = queryset.filter(tags__name__iexact=tag_name)
+            queryset = queryset.distinct()
+
+        queryset = queryset.order_by("-uploaded_at")
+        
+        total_count = queryset.count()
+        results = list(queryset[offset: offset + page_size])
+        
+        serializer = AudioFileSerializer(results, many=True, context={'request': request})
+
+        has_more = total_count > offset + page_size
         return Response(
             {
                 "results": serializer.data,
                 "has_more": has_more,
-                "page": page,
             }
         )
 
@@ -187,12 +196,30 @@ class TagListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
 
 
-class AudioFilesByTagView(generics.ListAPIView):
-    serializer_class = AudioFileSerializer
+class AudioFilesByTagView(APIView): # Changed from ListAPIView to APIView
     permission_classes = [permissions.AllowAny]
 
-    def get_queryset(self):
-        tag_name = self.kwargs["tag_name"]
-        return AudioFile.objects.filter(tags__name=tag_name, is_public=True).order_by(
-            "-uploaded_at"
+    def get(self, request, tag_name):
+        page = int(request.query_params.get("page", 1))
+        page_size = 10
+        offset = (page - 1) * page_size
+
+        # Base queryset filtered by tag name
+        queryset = AudioFile.objects.filter(
+            tags__name__iexact=tag_name, is_public=True
+        ).order_by("-uploaded_at")
+
+        total_count = queryset.count()
+        results = list(queryset[offset : offset + page_size])
+
+        # Pass request to serializer context to build full URLs for files
+        serializer = AudioFileSerializer(results, many=True, context={'request': request})
+
+        has_more = total_count > offset + page_size
+
+        return Response(
+            {
+                "results": serializer.data,
+                "has_more": has_more,
+            }
         )

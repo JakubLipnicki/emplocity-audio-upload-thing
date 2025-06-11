@@ -20,11 +20,9 @@
       </div>
 
       <div>
-        <!-- Authenticated State: Link to user's profile -->
         <NuxtLink v-if="isAuthenticated && user" :to="`/profile`">
           <User class="h-6 w-6 text-gray-700 hover:text-blue-600" />
         </NuxtLink>
-        <!-- Unauthenticated State: Link to login page -->
         <NuxtLink v-else to="/login">
           <User class="h-6 w-6 text-gray-700 hover:text-blue-600" />
         </NuxtLink>
@@ -35,13 +33,10 @@
 
 <script setup lang="ts">
 import { User } from "lucide-vue-next";
-// 1. Import the composable to get auth state
 import { useAuth } from "@/composables/useAuth";
 
-// 2. Get the reactive state and user data from the composable
 const { isAuthenticated, user } = useAuth();
 
-// 3. The hardcoded `isAuthenticated` line has been removed.
 
 interface NavLink {
   label: string;
