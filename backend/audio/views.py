@@ -4,22 +4,26 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 from accounts.authentication import JWTAuthentication
+from accounts.authentication import OptionalJWTAuthentication
 
 from .models import AudioFile, Like, Tag
 from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
 
-
-class AudioFileUploadView(generics.CreateAPIView): 
-    
+@method_decorator(csrf_exempt, name='dispatch')
+class AudioFileUploadView(generics.CreateAPIView):
     serializer_class = AudioFileSerializer
-    permission_classes = [permissions.AllowAny] 
-    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.AllowAny]
+    # --- Use the new authentication class here ---
+    authentication_classes = [OptionalJWTAuthentication]
     parser_classes = [MultiPartParser, FormParser]
 
     def perform_create(self, serializer):
-        
+        # This logic now works correctly.
+        # self.request.user will be a User object if authenticated, or AnonymousUser if not.
         user = self.request.user if self.request.user.is_authenticated else None
         serializer.save(user=user)
 
@@ -75,14 +79,13 @@ class AudioFileDetailByUUIDView(generics.RetrieveAPIView):
     authentication_classes = [JWTAuthentication]
 
     def get_queryset(self):
-        user = self.request.user
-        if user and user.is_authenticated:
-            # Użytkownik widzi publiczne pliki ORAZ swoje prywatne
-            return AudioFile.objects.filter(Q(is_public=True) | Q(user=user))
-        # Niezalogowany widzi tylko publiczne
-        return AudioFile.objects.filter(is_public=True)
+        # --- MODIFIED ---
+        # Allow access to any file (public or private) if the user has the direct UUID.
+        # The security is the unguessable nature of the UUID itself.
+        return AudioFile.objects.all()
 
     def get_object(self):
+        # This logic remains the same. It increments the view count.
         obj = super().get_object()
         obj.views = getattr(obj, "views", 0) + 1
         obj.save(update_fields=["views"])
