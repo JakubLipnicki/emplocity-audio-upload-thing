@@ -4,8 +4,16 @@ import { useAuth } from "@/composables/useAuth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import AudioFileCard from "@/components/AudioFileCard.vue";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
 
-// Define the interface for our audio files, matching the API response
 interface ApiAudioFile {
   id: number;
   uuid: string;
@@ -23,7 +31,6 @@ interface ApiAudioFile {
 }
 interface AudioFile extends ApiAudioFile {}
 
-// Use Nuxt's built-in route protection middleware
 definePageMeta({
   middleware: "auth",
 });
@@ -40,12 +47,13 @@ const errorUploaded = ref<string | null>(null);
 const errorLiked = ref<string | null>(null);
 const playedFiles = ref(new Set<string>());
 
-// Utility to get the first letter of a name for the avatar
+const isDeleteDialogOpen = ref(false);
+const fileToDelete = ref<AudioFile | null>(null);
+
 const getAvatarFallback = (name: string | undefined | null) => {
   return name && name.length > 0 ? name.charAt(0).toUpperCase() : "U";
 };
 
-// Function to construct the full media URL
 const processFiles = (files: ApiAudioFile[]): AudioFile[] => {
   return files.map((file) => ({
     ...file,
@@ -53,12 +61,11 @@ const processFiles = (files: ApiAudioFile[]): AudioFile[] => {
   }));
 };
 
-// Fetch files uploaded by the user
 const fetchUploadedFiles = async () => {
   loadingUploaded.value = true;
   errorUploaded.value = null;
   try {
-    const response = await $api.get<ApiAudioFile[]>("/api/audio/");
+    const response = await $api.get<ApiAudioFile[]>("/api/audio/my-files/");
     uploadedFiles.value = processFiles(response.data);
   } catch (e: any) {
     console.error("Error fetching uploaded files:", e);
@@ -68,7 +75,6 @@ const fetchUploadedFiles = async () => {
   }
 };
 
-// Fetch files liked by the user
 const fetchLikedFiles = async () => {
   loadingLiked.value = true;
   errorLiked.value = null;
@@ -90,12 +96,10 @@ onMounted(() => {
   }
 });
 
-// Navigate to the password reset page
 const resetPassword = () => {
-  navigateTo("/request-password/"); // Assuming this is the correct route
+  navigateTo("/request-password/");
 };
 
-// Optimistic UI for voting
 const handleVote = async (payload: {
   file: AudioFile;
   voteType: "like" | "dislike";
@@ -106,10 +110,11 @@ const handleVote = async (payload: {
     return;
   }
 
-  // Find the file in both lists to keep them in sync
   const fileInUploaded = uploadedFiles.value.find((f) => f.uuid === file.uuid);
   const fileInLiked = likedFiles.value.find((f) => f.uuid === file.uuid);
-  const filesToUpdate = [fileInUploaded, fileInLiked].filter(Boolean) as AudioFile[];
+  const filesToUpdate = [fileInUploaded, fileInLiked].filter(
+    Boolean
+  ) as AudioFile[];
 
   if (filesToUpdate.length === 0) return;
 
@@ -119,7 +124,6 @@ const handleVote = async (payload: {
     dislikes_count: f.dislikes_count,
   }));
 
-  // Optimistic update
   filesToUpdate.forEach((f) => {
     if (f.user_vote === voteType) {
       f.user_vote = null;
@@ -140,14 +144,12 @@ const handleVote = async (payload: {
     });
   } catch (err) {
     console.error("Failed to save vote:", err);
-    // Revert on error
     filesToUpdate.forEach((f, index) => {
       Object.assign(f, originalStates[index]);
     });
   }
 };
 
-// Handle view count increment
 const handlePlay = async (file: AudioFile) => {
   if (playedFiles.value.has(file.uuid)) return;
   playedFiles.value.add(file.uuid);
@@ -155,7 +157,9 @@ const handlePlay = async (file: AudioFile) => {
   try {
     const response = await $api.get<AudioFile>(`/api/audio/${file.uuid}/`);
     const updatedViews = response.data.views;
-    const fileInUploaded = uploadedFiles.value.find((f) => f.uuid === file.uuid);
+    const fileInUploaded = uploadedFiles.value.find(
+      (f) => f.uuid === file.uuid
+    );
     const fileInLiked = likedFiles.value.find((f) => f.uuid === file.uuid);
     if (fileInUploaded) fileInUploaded.views = updatedViews;
     if (fileInLiked) fileInLiked.views = updatedViews;
@@ -164,11 +168,36 @@ const handlePlay = async (file: AudioFile) => {
     playedFiles.value.delete(file.uuid);
   }
 };
+
+const handleDelete = (file: AudioFile) => {
+  fileToDelete.value = file;
+  isDeleteDialogOpen.value = true;
+};
+
+const confirmDelete = async () => {
+  if (!fileToDelete.value) return;
+
+  try {
+    await $api.delete(`/api/audio/${fileToDelete.value.uuid}/delete/`);
+
+    uploadedFiles.value = uploadedFiles.value.filter(
+      (f) => f.uuid !== fileToDelete.value!.uuid
+    );
+    likedFiles.value = likedFiles.value.filter(
+      (f) => f.uuid !== fileToDelete.value!.uuid
+    );
+  } catch (err) {
+    console.error("Failed to delete file:", err);
+  } finally {
+    isDeleteDialogOpen.value = false;
+    fileToDelete.value = null;
+  }
+};
 </script>
 
 <template>
   <div v-if="isAuthenticated && user" class="container mx-auto p-4">
-    <!-- User Info Panel -->
+
     <div class="flex justify-center mb-12">
       <div
         class="flex items-center gap-6 p-6 border rounded-lg shadow-sm bg-card text-card-foreground w-full max-w-lg"
@@ -188,9 +217,8 @@ const handlePlay = async (file: AudioFile) => {
       </div>
     </div>
 
-    <!-- Uploaded and Liked Files Sections -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-12">
-      <!-- Left Section: Uploaded Files -->
+
       <div>
         <h2 class="text-2xl font-bold mb-4">Twoje pliki</h2>
         <div v-if="loadingUploaded">Wczytywanie...</div>
@@ -205,13 +233,14 @@ const handlePlay = async (file: AudioFile) => {
             v-for="file in uploadedFiles"
             :key="'uploaded-' + file.id"
             :audio-file="file"
+            :show-delete-button="true"
             @vote="handleVote"
             @play="handlePlay"
+            @delete="handleDelete"
           />
         </div>
       </div>
 
-      <!-- Right Section: Liked Files -->
       <div>
         <h2 class="text-2xl font-bold mb-4">Polubione pliki</h2>
         <div v-if="loadingLiked">Wczytywanie...</div>
@@ -232,5 +261,24 @@ const handlePlay = async (file: AudioFile) => {
         </div>
       </div>
     </div>
+
+    <Dialog v-model:open="isDeleteDialogOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Potwierdź usunięcie</DialogTitle>
+          <DialogDescription>
+            Czy na pewno chcesz trwale usunąć plik
+            <strong>"{{ fileToDelete?.title }}"</strong>? Tej operacji nie
+            można cofnąć.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose as-child>
+            <Button variant="outline">Anuluj</Button>
+          </DialogClose>
+          <Button variant="destructive" @click="confirmDelete">Usuń</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

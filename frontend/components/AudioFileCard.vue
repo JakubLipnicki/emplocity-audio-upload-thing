@@ -2,9 +2,16 @@
 import {
   Card,
   CardContent,
-  CardTitle,
   CardDescription,
+  CardFooter,
+  CardTitle,
 } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import {
   ThumbsUp,
@@ -12,17 +19,8 @@ import {
   Globe,
   Lock,
   Eye,
-  MessageCircle,
+  Trash2,
 } from "lucide-vue-next";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import CommentSection from "@/components/CommentSection.vue";
-import { ref } from "vue";
-import { useAuth } from "@/composables/useAuth";
 
 interface AudioFile {
   id: number;
@@ -42,23 +40,25 @@ interface AudioFile {
 
 const props = defineProps<{
   audioFile: AudioFile;
+  showDeleteButton?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "vote", payload: { file: AudioFile; voteType: "like" | "dislike" }): void;
   (e: "play", file: AudioFile): void;
+  (e: "delete", file: AudioFile): void;
 }>();
 
-const { isAuthenticated } = useAuth();
-const activeCommentSection = ref<string | null>(null);
+const handleVote = (voteType: "like" | "dislike") => {
+  emit("vote", { file: props.audioFile, voteType });
+};
 
-const toggleCommentSection = (uuid: string) => {
-  if (!isAuthenticated.value) {
-    navigateTo("/login");
-    return;
-  }
-  activeCommentSection.value =
-    activeCommentSection.value === uuid ? null : uuid;
+const handlePlay = () => {
+  emit("play", props.audioFile);
+};
+
+const handleDelete = () => {
+  emit("delete", props.audioFile);
 };
 
 const formatDate = (dateString: string) => {
@@ -67,13 +67,13 @@ const formatDate = (dateString: string) => {
     month: "numeric",
     day: "numeric",
   };
-  return new Date(dateString).toLocaleDateString(undefined, options);
+  return new Date(dateString).toLocaleDateString("pl-PL", options);
 };
 </script>
 
 <template>
-  <Card>
-    <CardContent class="p-6">
+  <Card class="w-full flex flex-col">
+    <CardContent class="p-6 flex-grow">
       <div class="flex justify-between items-start gap-2">
         <CardTitle>{{ audioFile.title }}</CardTitle>
         <TooltipProvider :delay-duration="100">
@@ -95,7 +95,7 @@ const formatDate = (dateString: string) => {
         Autor: {{ audioFile.uploader || "Anonim" }}
       </CardDescription>
       <CardDescription class="mb-2 mt-1">
-        Opublikowane: {{ formatDate(audioFile.uploaded_at) }}
+        Opublikowano: {{ formatDate(audioFile.uploaded_at) }}
       </CardDescription>
       <CardDescription v-if="audioFile.description" class="mb-2">
         Opis: {{ audioFile.description }}
@@ -124,78 +124,86 @@ const formatDate = (dateString: string) => {
         controls
         :src="audioFile.file"
         class="w-full mt-4"
-        @play="emit('play', audioFile)"
+        @play="handlePlay"
       >
         Your browser does not support the audio element.
       </audio>
-      <div
-        class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-start"
-      >
-        <div class="flex items-center space-x-6">
-          <div class="flex items-center space-x-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              @click="emit('vote', { file: audioFile, voteType: 'like' })"
-              :class="{ 'text-blue-500': audioFile.user_vote === 'like' }"
-              aria-label="Like"
-            >
-              <ThumbsUp
-                class="h-5 w-5"
-                :class="{
-                  'fill-blue-500 dark:fill-blue-700 opacity-50':
-                    audioFile.user_vote === 'like',
-                }"
-              />
-            </Button>
-            <span class="text-sm min-w-[20px] text-center">{{
-              audioFile.likes_count
-            }}</span>
-          </div>
-          <div class="flex items-center space-x-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              @click="emit('vote', { file: audioFile, voteType: 'dislike' })"
-              :class="{
-                'text-red-500': audioFile.user_vote === 'dislike',
-              }"
-              aria-label="Dislike"
-            >
-              <ThumbsDown
-                class="h-5 w-5"
-                :class="{
-                  'fill-red-500 dark:fill-red-700 opacity-50':
-                    audioFile.user_vote === 'dislike',
-                }"
-              />
-            </Button>
-            <span class="text-sm min-w-[20px] text-center">{{
-              audioFile.dislikes_count
-            }}</span>
-          </div>
-          <div class="flex items-center space-x-1 text-gray-500">
-            <Eye class="h-5 w-5" />
-            <span class="text-sm min-w-[20px] text-center">{{
-              audioFile.views
-            }}</span>
-          </div>
-        </div>
-        <div class="flex-grow flex justify-end">
+    </CardContent>
+
+    <CardFooter
+      class="mt-auto border-t border-gray-200 dark:border-gray-700 flex items-center justify-between mt-4 pt-4 px-6 pb-6"
+    >
+      <!-- Left side: Stats -->
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-1">
           <Button
             variant="ghost"
             size="icon"
-            @click="toggleCommentSection(audioFile.uuid)"
-            aria-label="Toggle Comments"
+            @click="handleVote('like')"
+            :class="{ 'text-blue-500': audioFile.user_vote === 'like' }"
+            aria-label="Like"
           >
-            <MessageCircle class="h-5 w-5" />
+            <ThumbsUp
+              class="h-5 w-5"
+              :class="{
+                'fill-blue-500 dark:fill-blue-700 opacity-50':
+                  audioFile.user_vote === 'like',
+              }"
+            />
           </Button>
+          <span class="text-sm min-w-[20px] text-center">{{
+            audioFile.likes_count
+          }}</span>
+        </div>
+        <div class="flex items-center space-x-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            @click="handleVote('dislike')"
+            :class="{ 'text-red-500': audioFile.user_vote === 'dislike' }"
+            aria-label="Dislike"
+          >
+            <ThumbsDown
+              class="h-5 w-5"
+              :class="{
+                'fill-red-500 dark:fill-red-700 opacity-50':
+                  audioFile.user_vote === 'dislike',
+              }"
+            />
+          </Button>
+          <span class="text-sm min-w-[20px] text-center">{{
+            audioFile.dislikes_count
+          }}</span>
+        </div>
+        <div class="flex items-center space-x-1 text-gray-500">
+          <Eye class="h-5 w-5" />
+          <span class="text-sm min-w-[20px] text-center">{{
+            audioFile.views
+          }}</span>
         </div>
       </div>
-      <CommentSection
-        v-if="activeCommentSection === audioFile.uuid"
-        :audio-file-uuid="audioFile.uuid"
-      />
-    </CardContent>
+
+      <!-- Right side: Delete Button (conditional) -->
+      <div v-if="showDeleteButton">
+        <TooltipProvider :delay-duration="200">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                @click.capture="handleDelete"
+                variant="ghost"
+                size="icon"
+                class="text-red-500 hover:text-red-700"
+                aria-label="Delete"
+              >
+                <Trash2 class="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Usuń plik</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </CardFooter>
   </Card>
 </template>
