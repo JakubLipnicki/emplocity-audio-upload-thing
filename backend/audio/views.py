@@ -1,4 +1,4 @@
-from django.db.models import Count, ExpressionWrapper, F, FloatField, Q, Value
+from django.db.models import Count, ExpressionWrapper, F, FloatField, Q
 from rest_framework import generics, permissions
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -10,6 +10,7 @@ from django.utils.decorators import method_decorator
 from accounts.authentication import JWTAuthentication
 from accounts.authentication import OptionalJWTAuthentication
 
+
 from .models import AudioFile, Like, Tag
 from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
 
@@ -17,13 +18,12 @@ from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
 class AudioFileUploadView(generics.CreateAPIView):
     serializer_class = AudioFileSerializer
     permission_classes = [permissions.AllowAny]
-    # --- Use the new authentication class here ---
+
     authentication_classes = [OptionalJWTAuthentication]
     parser_classes = [MultiPartParser, FormParser]
 
     def perform_create(self, serializer):
-        # This logic now works correctly.
-        # self.request.user will be a User object if authenticated, or AnonymousUser if not.
+
         user = self.request.user if self.request.user.is_authenticated else None
         serializer.save(user=user)
 
@@ -34,6 +34,7 @@ class LatestAudioFilesView(APIView):
     def get(self, request):
         page = int(request.query_params.get("page", 1))
         tags_to_filter = request.query_params.getlist("tags") 
+
         page_size = 10
         offset = (page - 1) * page_size
 
@@ -58,6 +59,26 @@ class LatestAudioFilesView(APIView):
                 "has_more": has_more,
             }
         )
+      
+        total_count = queryset.count()
+        results = list(queryset[offset: offset + page_size])
+
+        serializer = AudioFileSerializer(results, many=True, context={'request': request})
+        has_more = total_count > offset + page_size
+
+        return Response({
+            "results": serializer.data,
+            "has_more": has_more,
+        })
+
+
+class UserUploadedAudioFilesView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = AudioFileSerializer
+
+    def get_queryset(self):
+        return AudioFile.objects.filter(user=self.request.user).order_by("-uploaded_at")
 
 class UserUploadedAudioFilesView(generics.ListAPIView):
     
@@ -79,9 +100,6 @@ class AudioFileDetailByUUIDView(generics.RetrieveAPIView):
     authentication_classes = [JWTAuthentication]
 
     def get_queryset(self):
-        # --- MODIFIED ---
-        # Allow access to any file (public or private) if the user has the direct UUID.
-        # The security is the unguessable nature of the UUID itself.
         return AudioFile.objects.all()
 
     def get_object(self):
@@ -113,15 +131,12 @@ class AddLikeView(APIView):
             raise NotFound("Audio file not found.")
 
         is_liked = request.data.get("is_liked")
-
         if is_liked is None:
             raise ValidationError({"is_liked": "This field is required."})
-
-        # is_liked musi być booleanem
         if not isinstance(is_liked, bool):
             raise ValidationError({"is_liked": "This field must be a boolean."})
 
-        like, created = Like.objects.update_or_create(
+        like, _ = Like.objects.update_or_create(
             user=request.user,
             audio_file=audio_file,
             defaults={"is_liked": is_liked},
@@ -155,12 +170,10 @@ class AudioFileLikesCountView(APIView):
         likes_count = audio_file.likes.filter(is_liked=True).count()
         dislikes_count = audio_file.likes.filter(is_liked=False).count()
 
-        return Response(
-            {
-                "likes": likes_count,
-                "dislikes": dislikes_count,
-            }
-        )
+        return Response({
+            "likes": likes_count,
+            "dislikes": dislikes_count,
+        })
 
 
 class TopRatedAudioFilesView(APIView):
@@ -168,7 +181,6 @@ class TopRatedAudioFilesView(APIView):
 
     def get(self, request):
         search_query = request.query_params.get("search", "")
-
         queryset = AudioFile.objects.filter(is_public=True)
 
         if search_query:
@@ -180,7 +192,6 @@ class TopRatedAudioFilesView(APIView):
                 dislikes_count=Count("likes", filter=Q(likes__is_liked=False)),
             )
             .annotate(
-                # Dodajemy 1 do mianownika, aby uniknąć dzielenia przez zero
                 like_ratio=ExpressionWrapper(
                     (1.0 * F("likes_count")) / (F("dislikes_count") + 1.0),
                     output_field=FloatField(),
@@ -200,6 +211,7 @@ class TagListView(generics.ListAPIView):
 
 
 class AudioFilesByTagView(APIView): # Changed from ListAPIView to APIView
+
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, tag_name):
@@ -207,7 +219,6 @@ class AudioFilesByTagView(APIView): # Changed from ListAPIView to APIView
         page_size = 10
         offset = (page - 1) * page_size
 
-        # Base queryset filtered by tag name
         queryset = AudioFile.objects.filter(
             tags__name__iexact=tag_name, is_public=True
         ).order_by("-uploaded_at")
@@ -226,3 +237,4 @@ class AudioFilesByTagView(APIView): # Changed from ListAPIView to APIView
                 "has_more": has_more,
             }
         )
+

@@ -1,12 +1,12 @@
 import datetime
 
 import jwt
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
-from django.utils.decorators import method_decorator
 from decouple import config
 from django.conf import settings
 from django.core.mail import send_mail
 from django.shortcuts import redirect
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny  # Dodano IsAuthenticated
@@ -68,6 +68,7 @@ class VerifyEmailView(APIView):
             user.save(update_fields=["is_active"])
             return redirect(f"{frontend_redirect_url}?success=true")
         return redirect(f"{frontend_redirect_url}?already_active=true")
+
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class LoginView(APIView):
@@ -145,7 +146,7 @@ class RequestPasswordResetView(APIView):
         user = User.objects.filter(email=email).first()
         if user and user.is_active:
             token = generate_password_reset_token(user.id)
-            reset_link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password-confirm/?token={token}"
+            reset_link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password/?token={token}"
             send_mail(
                 "Password Reset Request",
                 f"Click the link to reset your password: {reset_link}",
