@@ -1,3 +1,175 @@
+<script setup>
+import { ref, computed, onMounted } from "vue";
+import { useNuxtApp } from "#app";
+import { useAuth } from "@/composables/useAuth";
+import { useClipboard } from "@vueuse/core";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+// Composables
+const { accessToken, isAuthenticated } = useAuth();
+const { $api } = useNuxtApp();
+
+// Component State
+const title = ref("");
+const description = ref("");
+const selectedFile = ref(null);
+const fileError = ref("");
+const isUploading = ref(false);
+const fileInput = ref(null);
+const isPublic = ref(true);
+const availableTags = ref([]);
+const selectedTags = ref(new Set());
+
+// Dialog State
+const isSuccessDialogOpen = ref(false);
+const isLinkDialogOpen = ref(false);
+const shareableLink = ref("");
+const { copy, copied } = useClipboard({ source: shareableLink });
+
+// Computed property for form validation
+const isValid = computed(() => {
+  return title.value.trim() !== "" && selectedFile.value !== null;
+});
+
+// Fetch available tags on component mount
+onMounted(async () => {
+  try {
+    const response = await $api.get("/api/audio/tags/");
+    availableTags.value = response.data;
+  } catch (error) {
+    console.error("Failed to fetch tags:", error);
+  }
+});
+
+// Helper functions
+const toggleTag = (tagName) => {
+  if (selectedTags.value.has(tagName)) {
+    selectedTags.value.delete(tagName);
+  } else {
+    selectedTags.value.add(tagName);
+  }
+};
+
+const handleFileChange = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    validateFile(file);
+  }
+};
+
+const validateFile = (file) => {
+  fileError.value = "";
+  const allowedTypes = [".mp3", ".wav", ".m4a", ".ogg", ".flac"];
+  const fileExtension = file.name
+    .substring(file.name.lastIndexOf("."))
+    .toLowerCase();
+  if (!allowedTypes.includes(fileExtension)) {
+    fileError.value = "Akceptowane typy plikow to: MP3, WAV, M4A, OGG, FLAC.";
+    return;
+  }
+  const maxSize = 50 * 1024 * 1024; // 50MB
+  if (file.size > maxSize) {
+    fileError.value = "Maksymalny rozmiar pliku to 50MB";
+    return;
+  }
+  selectedFile.value = file;
+};
+
+const removeFile = (e) => {
+  e.stopPropagation();
+  selectedFile.value = null;
+  if (fileInput.value) {
+    fileInput.value.value = "";
+  }
+};
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
+const resetForm = () => {
+  title.value = "";
+  description.value = "";
+  selectedFile.value = null;
+  if (fileInput.value) {
+    fileInput.value.value = "";
+  }
+  isPublic.value = true;
+  selectedTags.value.clear();
+  fileError.value = "";
+};
+
+// Main upload function
+const uploadFile = async () => {
+  if (!isValid.value) return;
+  isUploading.value = true;
+  fileError.value = "";
+
+  const formData = new FormData();
+  formData.append("title", title.value);
+  if (description.value) {
+    formData.append("description", description.value);
+  }
+  formData.append("file", selectedFile.value);
+  formData.append("is_public", isPublic.value.toString());
+  selectedTags.value.forEach((tag) => {
+    formData.append("tags", tag);
+  });
+
+  const headers = {};
+  if (accessToken.value) {
+    headers["Authorization"] = `Bearer ${accessToken.value}`;
+  }
+
+  try {
+    const response = await $api.post("/api/audio/upload/", formData, {
+      headers: headers,
+    });
+
+    // Conditional success logic
+    if (!isAuthenticated.value && !isPublic.value) {
+      // Case: Anonymous user uploading a private file
+      const uuid = response.data.uuid;
+      if (uuid) {
+        shareableLink.value = `${window.location.origin}/audio/${uuid}`;
+        isLinkDialogOpen.value = true;
+      }
+    } else {
+      // Default case for all other uploads
+      isSuccessDialogOpen.value = true;
+    }
+    resetForm();
+  } catch (error) {
+    // Corrected error handling
+    const errorMessage =
+      error.response?.data?.detail ||
+      error.response?.data?.message ||
+      error.message ||
+      "Blad podczas przesylania";
+    fileError.value = errorMessage;
+    console.error("Upload error:", error);
+  } finally {
+    isUploading.value = false;
+  }
+};
+</script>
+
 <template>
   <div class="w-full max-w-md mx-auto">
     <div class="bg-white rounded-lg shadow p-6">
@@ -100,8 +272,9 @@
 
         <div class="flex items-center justify-between pt-2">
           <div class="flex items-center space-x-2">
+            <!-- --- THIS IS THE CORRECTED LINE --- -->
             <Switch id="is-public-switch" v-model="isPublic" />
-      <Label for="is-public-switch">Publiczny</Label>
+            <Label for="is-public-switch">Publiczny</Label>
           </div>
 
           <button
@@ -115,7 +288,7 @@
       </form>
     </div>
 
-    <!-- --- NEW: SUCCESS DIALOG --- -->
+    <!-- Standard Success Dialog -->
     <Dialog v-model:open="isSuccessDialogOpen">
       <DialogContent>
         <DialogHeader>
@@ -129,157 +302,27 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    <!-- --- END: SUCCESS DIALOG --- -->
+
+    <!-- Shareable Link Dialog -->
+    <Dialog v-model:open="isLinkDialogOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Prywatny link do pliku</DialogTitle>
+          <DialogDescription>
+            Twój plik został przesłany jako prywatny. Użyj poniższego linku, aby
+            go wyświetlić i udostępnić.
+          </DialogDescription>
+        </DialogHeader>
+        <div class="flex items-center space-x-2 mt-4">
+          <Input id="link" :default-value="shareableLink" readonly />
+          <Button @click="copy(shareableLink)">
+            {{ copied ? "Skopiowano!" : "Kopiuj" }}
+          </Button>
+        </div>
+        <DialogFooter class="mt-4">
+          <Button @click="isLinkDialogOpen = false">Zamknij</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
-
-<script setup>
-import { ref, computed, onMounted } from "vue";
-import { useNuxtApp } from "#app";
-import { useAuth } from "@/composables/useAuth";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-// --- NEW: IMPORT DIALOG COMPONENTS ---
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-
-const { accessToken } = useAuth();
-const { $api } = useNuxtApp();
-
-const title = ref("");
-const description = ref("");
-const selectedFile = ref(null);
-const fileError = ref("");
-const isUploading = ref(false);
-const fileInput = ref(null);
-const isPublic = ref(true);
-
-const availableTags = ref([]);
-const selectedTags = ref(new Set());
-
-// --- NEW: REF FOR DIALOG VISIBILITY ---
-const isSuccessDialogOpen = ref(false);
-
-const isValid = computed(() => {
-  return title.value.trim() !== "" && selectedFile.value !== null;
-});
-
-onMounted(async () => {
-  try {
-    const response = await $api.get("/api/audio/tags/");
-    availableTags.value = response.data;
-  } catch (error) {
-    console.error("Failed to fetch tags:", error);
-  }
-});
-
-const toggleTag = (tagName) => {
-  if (selectedTags.value.has(tagName)) {
-    selectedTags.value.delete(tagName);
-  } else {
-    selectedTags.value.add(tagName);
-  }
-};
-
-const handleFileChange = (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    validateFile(file);
-  }
-};
-const validateFile = (file) => {
-  fileError.value = "";
-  const allowedTypes = [".mp3", ".wav", ".m4a", ".ogg", ".flac"];
-  const fileExtension = file.name
-    .substring(file.name.lastIndexOf("."))
-    .toLowerCase();
-  if (!allowedTypes.includes(fileExtension)) {
-    fileError.value = "Akceptowane typy plikow to: MP3, WAV, M4A, OGG, FLAC.";
-    return;
-  }
-  const maxSize = 50 * 1024 * 1024;
-  if (file.size > maxSize) {
-    fileError.value = "Maksymalny rozmiar pliku to 50MB";
-    return;
-  }
-  selectedFile.value = file;
-};
-const removeFile = (e) => {
-  e.stopPropagation();
-  selectedFile.value = null;
-  if (fileInput.value) {
-    fileInput.value.value = "";
-  }
-};
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-};
-
-const uploadFile = async () => {
-  if (!isValid.value) return;
-  isUploading.value = true;
-
-  try {
-    const formData = new FormData();
-    formData.append("title", title.value);
-    if (description.value) {
-      formData.append("description", description.value);
-    }
-    formData.append("file", selectedFile.value);
-    formData.append("is_public", isPublic.value.toString());
-    selectedTags.value.forEach((tag) => {
-      formData.append("tags", tag);
-    });
-
-    console.log(
-      "Value of is_public being sent:",
-      isPublic.value,
-      "as string:",
-      isPublic.value.toString()
-    );
-
-    const headers = {};
-    if (accessToken.value) {
-      headers["Authorization"] = `Bearer ${accessToken.value}`;
-    }
-
-    await $api.post("/api/audio/upload/", formData, {
-      headers: headers,
-    });
-
-    // Reset form on success
-    title.value = "";
-    description.value = "";
-    selectedFile.value = null;
-    if (fileInput.value) {
-      fileInput.value.value = "";
-    }
-    isPublic.value = true;
-    selectedTags.value.clear();
-
-    // --- REPLACE alert() WITH DIALOG TRIGGER ---
-    isSuccessDialogOpen.value = true;
-  } catch (error) {
-    const errorMessage =
-      error.response?.data?.detail ||
-      error.message ||
-      "Blad podczas przesylania";
-    fileError.value = errorMessage;
-    console.error("Upload error:", error);
-  } finally {
-    isUploading.value = false;
-  }
-};
-</script>

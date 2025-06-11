@@ -73,3 +73,14 @@ class JWTAuthentication(BaseAuthentication):
             user,
             token_to_decode,
         )  # Możesz zwrócić token, jeśli inne części DRF go używają
+
+class OptionalJWTAuthentication(JWTAuthentication):
+    def authenticate(self, request):
+        try:
+            # Try to authenticate using the parent class's logic
+            return super().authenticate(request)
+        except AuthenticationFailed:
+            # If any authentication error occurs (e.g., no token, invalid token),
+            # we simply return None, indicating an anonymous user.
+            # DRF will then treat the request as unauthenticated.
+            return None

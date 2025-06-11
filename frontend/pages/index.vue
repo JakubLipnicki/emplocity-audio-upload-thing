@@ -1,30 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
 import { useWindowFocus } from "@vueuse/core";
-import {
-  Card,
-  CardContent,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  ThumbsUp,
-  ThumbsDown,
-  Globe,
-  Lock,
-  Eye,
-  MessageCircle,
-  X,
-} from "lucide-vue-next";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import CommentSection from "@/components/CommentSection.vue";
+import { X } from "lucide-vue-next";
+import AudioCard from "@/components/AudioCard.vue";
 
+// Define interfaces
 interface ApiAudioFile {
   id: number;
   uuid: string;
@@ -46,6 +27,7 @@ interface ApiTag {
   name: string;
 }
 
+// Component state
 const latestAudioFiles = ref<AudioFile[]>([]);
 const loading = ref(true);
 const loadingMore = ref(false);
@@ -58,11 +40,12 @@ const activeTags = ref<string[]>([]);
 const allTags = ref<string[]>([]);
 const tagsLoading = ref(true);
 
+// Composables and plugins
 const { $api } = useNuxtApp();
 const { isAuthenticated } = useAuth();
-
 const isFocused = useWindowFocus();
 
+// Event Handlers
 const toggleCommentSection = (uuid: string) => {
   if (!isAuthenticated.value) {
     navigateTo("/login");
@@ -92,6 +75,55 @@ const clearAllTags = () => {
   }
 };
 
+const handleVote = async (
+  file: AudioFile,
+  voteType: "like" | "dislike"
+) => {
+  if (!isAuthenticated.value) {
+    navigateTo("/login");
+    return;
+  }
+  const originalVote = file.user_vote;
+  const originalLikes = file.likes_count;
+  const originalDislikes = file.dislikes_count;
+  if (file.user_vote === voteType) {
+    file.user_vote = null;
+    if (voteType === "like") file.likes_count--;
+    else file.dislikes_count--;
+  } else {
+    if (file.user_vote === "like") file.likes_count--;
+    if (file.user_vote === "dislike") file.dislikes_count--;
+    file.user_vote = voteType;
+    if (voteType === "like") file.likes_count++;
+    else file.dislikes_count++;
+  }
+  try {
+    await $api.post(`/api/audio/${file.uuid}/like/`, {
+      is_liked: voteType === "like",
+    });
+  } catch (err) {
+    console.error("Failed to save vote:", err);
+    file.user_vote = originalVote;
+    file.likes_count = originalLikes;
+    file.dislikes_count = originalDislikes;
+  }
+};
+
+const handlePlay = async (file: AudioFile) => {
+  if (playedFiles.value.has(file.uuid)) {
+    return;
+  }
+  playedFiles.value.add(file.uuid);
+  try {
+    const response = await $api.get<AudioFile>(`/api/audio/${file.uuid}/`);
+    file.views = response.data.views;
+  } catch (err) {
+    console.error("Failed to increment view count:", err);
+    playedFiles.value.delete(file.uuid);
+  }
+};
+
+// Data Fetching
 const resetAndFetch = () => {
   latestAudioFiles.value = [];
   page.value = 1;
@@ -100,13 +132,6 @@ const resetAndFetch = () => {
   activeCommentSection.value = null;
   fetchAudioFiles();
 };
-
-watch(isFocused, (isNowFocused) => {
-  if (isNowFocused && !loading.value) {
-    activeTags.value = [];
-    resetAndFetch();
-  }
-});
 
 const fetchAudioFiles = async () => {
   if (!hasMore.value) return;
@@ -149,88 +174,37 @@ const fetchAudioFiles = async () => {
   }
 };
 
-
 const fetchAllTags = async () => {
   tagsLoading.value = true;
   try {
     const response = await $api.get<ApiTag[]>("/api/audio/tags/");
-
     allTags.value = response.data.map((tag) => tag.name);
   } catch (e) {
     console.error("Failed to fetch all tags:", e);
-
   } finally {
     tagsLoading.value = false;
   }
 };
 
-onMounted(() => {
+// Lifecycle Hooks
+watch(isFocused, (isNowFocused) => {
+  if (isNowFocused && !loading.value) {
+    activeTags.value = [];
+    resetAndFetch();
+  }
+});
 
+onMounted(() => {
   fetchAudioFiles();
   fetchAllTags();
 });
-
-const handleVote = async (
-  file: AudioFile,
-  voteType: "like" | "dislike"
-) => {
-  if (!isAuthenticated.value) {
-    navigateTo("/login");
-    return;
-  }
-  const originalVote = file.user_vote;
-  const originalLikes = file.likes_count;
-  const originalDislikes = file.dislikes_count;
-  if (file.user_vote === voteType) {
-    file.user_vote = null;
-    if (voteType === "like") file.likes_count--;
-    else file.dislikes_count--;
-  } else {
-    if (file.user_vote === "like") file.likes_count--;
-    if (file.user_vote === "dislike") file.dislikes_count--;
-    file.user_vote = voteType;
-    if (voteType === "like") file.likes_count++;
-    else file.dislikes_count++;
-  }
-  try {
-    await $api.post(`/api/audio/${file.uuid}/like/`, {
-      is_liked: voteType === "like",
-    });
-  } catch (err) {
-    console.error("Failed to save vote:", err);
-    file.user_vote = originalVote;
-    file.likes_count = originalLikes;
-    file.dislikes_count = originalDislikes;
-  }
-};
-const handlePlay = async (file: AudioFile) => {
-  if (playedFiles.value.has(file.uuid)) {
-    return;
-  }
-  playedFiles.value.add(file.uuid);
-  try {
-    const response = await $api.get<AudioFile>(`/api/audio/${file.uuid}/`);
-    file.views = response.data.views;
-  } catch (err) {
-    console.error("Failed to increment view count:", err);
-    playedFiles.value.delete(file.uuid);
-  }
-};
-const formatDate = (dateString: string) => {
-  const options: Intl.DateTimeFormatOptions = {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  };
-  return new Date(dateString).toLocaleDateString(undefined, options);
-};
 </script>
 
 <template>
   <div>
-
     <h2 class="text-2xl font-bold mb-4 text-center">Przeglądaj pliki!</h2>
 
+    <!-- All Tags Filter Section -->
     <div v-if="tagsLoading" class="text-center text-gray-500 my-4">
       Wczytywanie tagów...
     </div>
@@ -249,6 +223,7 @@ const formatDate = (dateString: string) => {
       </Button>
     </div>
 
+    <!-- Active Filter Status Indicator -->
     <div
       v-if="activeTags.length > 0 && !loading"
       class="mb-4 flex items-center justify-between gap-4 p-3 bg-muted rounded-lg"
@@ -269,6 +244,7 @@ const formatDate = (dateString: string) => {
       </Button>
     </div>
 
+    <!-- Main Content Area -->
     <div v-if="loading" class="text-center">Wczytywanie...</div>
     <div v-else-if="error" class="text-center text-red-500">
       Error : {{ error }}
@@ -281,133 +257,21 @@ const formatDate = (dateString: string) => {
         Brak plikow
       </div>
       <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card v-for="audioFile in latestAudioFiles" :key="audioFile.id">
-          <CardContent class="p-6">
-            <div class="flex justify-between items-start gap-2">
-              <CardTitle>{{ audioFile.title }}</CardTitle>
-              <TooltipProvider :delay-duration="100">
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Globe
-                      v-if="audioFile.is_public"
-                      class="h-5 w-5 text-gray-500"
-                    />
-                    <Lock v-else class="h-5 w-5 text-gray-500" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{{ audioFile.is_public ? "Public" : "Private" }}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <CardDescription class="mb-2 mt-1 text-sm">
-              Autor: {{ audioFile.uploader || "Anonim" }}
-            </CardDescription>
-            <CardDescription class="mb-2 mt-1">
-              Opublikowane: {{ formatDate(audioFile.uploaded_at) }}
-            </CardDescription>
-            <CardDescription v-if="audioFile.description" class="mb-2">
-              Opis: {{ audioFile.description }}
-            </CardDescription>
-            <CardDescription v-else class="mb-2 text-sm text-gray-500">
-              Opis: Brak opisu
-            </CardDescription>
-
-            <div
-              v-if="audioFile.tags && audioFile.tags.length > 0"
-              class="my-3 flex flex-wrap gap-2"
-            >
-              <Button
-                v-for="tag in audioFile.tags"
-                :key="tag"
-                :variant="activeTags.includes(tag) ? 'default' : 'outline'"
-                size="sm"
-                class="h-7 cursor-pointer"
-                @click="handleTagClick(tag)"
-              >
-                {{ tag }}
-              </Button>
-            </div>
-
-            <audio
-              controls
-              :src="audioFile.file"
-              class="w-full mt-4"
-              @play="handlePlay(audioFile)"
-            >
-              Your browser does not support the audio element.
-            </audio>
-            <div
-              class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-start"
-            >
-              <div class="flex items-center space-x-6">
-                <div class="flex items-center space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    @click="handleVote(audioFile, 'like')"
-                    :class="{ 'text-blue-500': audioFile.user_vote === 'like' }"
-                    aria-label="Like"
-                  >
-                    <ThumbsUp
-                      class="h-5 w-5"
-                      :class="{
-                        'fill-blue-500 dark:fill-blue-700 opacity-50':
-                          audioFile.user_vote === 'like',
-                      }"
-                    />
-                  </Button>
-                  <span class="text-sm min-w-[20px] text-center">{{
-                    audioFile.likes_count
-                  }}</span>
-                </div>
-                <div class="flex items-center space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    @click="handleVote(audioFile, 'dislike')"
-                    :class="{
-                      'text-red-500': audioFile.user_vote === 'dislike',
-                    }"
-                    aria-label="Dislike"
-                  >
-                    <ThumbsDown
-                      class="h-5 w-5"
-                      :class="{
-                        'fill-red-500 dark:fill-red-700 opacity-50':
-                          audioFile.user_vote === 'dislike',
-                      }"
-                    />
-                  </Button>
-                  <span class="text-sm min-w-[20px] text-center">{{
-                    audioFile.dislikes_count
-                  }}</span>
-                </div>
-                <div class="flex items-center space-x-1 text-gray-500">
-                  <Eye class="h-5 w-5" />
-                  <span class="text-sm min-w-[20px] text-center">{{
-                    audioFile.views
-                  }}</span>
-                </div>
-              </div>
-              <div class="flex-grow flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  @click="toggleCommentSection(audioFile.uuid)"
-                  aria-label="Toggle Comments"
-                >
-                  <MessageCircle class="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-            <CommentSection
-              v-if="activeCommentSection === audioFile.uuid"
-              :audio-file-uuid="audioFile.uuid"
-            />
-          </CardContent>
-        </Card>
+        <!-- Use the new AudioCard component -->
+        <AudioCard
+          v-for="audioFile in latestAudioFiles"
+          :key="audioFile.id"
+          :audio-file="audioFile"
+          :is-authenticated="isAuthenticated"
+          :active-comment-section="activeCommentSection"
+          :active-tags="activeTags"
+          @vote="handleVote"
+          @play="handlePlay"
+          @toggle-comments="toggleCommentSection"
+          @tag-click="handleTagClick"
+        />
       </div>
+      <!-- Load More Section -->
       <div class="mt-8 text-center">
         <Button
           v-if="hasMore && !loadingMore"

@@ -68,6 +68,7 @@ class AudioFileSerializer(serializers.ModelSerializer):
         rep = super().to_representation(instance)
         rep["file"] = urljoin(settings.AUDIO_FILE_BASE_URL + "/", instance.file.name)
         rep["tags"] = [tag.name for tag in instance.tags.all()]
+        rep["uuid"] = str(instance.uuid)
         return rep
 
 
