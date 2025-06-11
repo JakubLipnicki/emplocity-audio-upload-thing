@@ -1,12 +1,12 @@
 import datetime
 
 import jwt
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
-from django.utils.decorators import method_decorator
 from decouple import config
 from django.conf import settings
 from django.core.mail import send_mail
 from django.shortcuts import redirect
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny  # Dodano IsAuthenticated
@@ -68,6 +68,7 @@ class VerifyEmailView(APIView):
             user.save(update_fields=["is_active"])
             return redirect(f"{frontend_redirect_url}?success=true")
         return redirect(f"{frontend_redirect_url}?already_active=true")
+
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class LoginView(APIView):

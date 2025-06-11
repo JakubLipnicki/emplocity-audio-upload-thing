@@ -4,34 +4,34 @@ import datetime
 import time
 from unittest.mock import patch
 
+import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.test import APITestCase, APIRequestFactory
-
-import jwt
+from rest_framework.test import APIRequestFactory, APITestCase
 
 # Importy z aplikacji 'accounts'
 from .authentication import JWTAuthentication
 from .models import User
 from .serializers import UserSerializer
 from .utils import (
-    generate_password_reset_token,
-    generate_verification_token,
-    decode_token,
-    generate_access_token,
-    generate_refresh_token,
-    decode_verification_token,
     decode_password_reset_token,
+    decode_token,
+    decode_verification_token,
+    generate_access_token,
+    generate_password_reset_token,
+    generate_refresh_token,
+    generate_verification_token,
 )
 
 User = get_user_model()
 
 
 # --- Testy Jednostkowe dla Logiki Biznesowej (nie-API) ---
+
 
 class TestCustomUserManager(APITestCase):
     """Testy dla menedżera CustomUserManager."""
@@ -73,7 +73,7 @@ class TestCustomUserManager(APITestCase):
 
     def test_create_superuser_not_superuser_raises_value_error(self):
         with self.assertRaises(
-                ValueError, msg="Superuser must have is_superuser=True."
+            ValueError, msg="Superuser must have is_superuser=True."
         ):
             User.objects.create_superuser(
                 email="super@user.com",
@@ -133,7 +133,7 @@ class TestJWTUtils(APITestCase):
             "user_id": self.user.id,
             "type": "access",
             "exp": past_time,
-            "iat": past_time - datetime.timedelta(hours=1)
+            "iat": past_time - datetime.timedelta(hours=1),
         }
         expired_token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
@@ -142,7 +142,9 @@ class TestJWTUtils(APITestCase):
 
     def test_decode_token_invalid_signature(self):
         token = jwt.encode(
-            {"user_id": self.user.id, "type": "access"}, "wrong-secret", algorithm="HS256"
+            {"user_id": self.user.id, "type": "access"},
+            "wrong-secret",
+            algorithm="HS256",
         )
         with self.assertRaisesMessage(AuthenticationFailed, "Invalid token"):
             decode_token(token, expected_type="access")
@@ -155,39 +157,51 @@ class TestJWTUtils(APITestCase):
     def test_decode_verification_token_expired(self):
         with override_settings(EMAIL_VERIFICATION_EXPIRATION_HOURS=-1):
             token = generate_verification_token(self.user.id)
-            with self.assertRaisesMessage(AuthenticationFailed, "Verification token expired"):
+            with self.assertRaisesMessage(
+                AuthenticationFailed, "Verification token expired"
+            ):
                 decode_verification_token(token)
 
     # OSTATECZNY TEST POKRYWAJĄCY BLOK `except`
     @patch("accounts.utils.jwt.decode")
     def test_decode_verification_token_invalid_token_error(self, mock_jwt_decode):
         mock_jwt_decode.side_effect = jwt.InvalidTokenError
-        with self.assertRaisesMessage(AuthenticationFailed, "Invalid verification token"):
+        with self.assertRaisesMessage(
+            AuthenticationFailed, "Invalid verification token"
+        ):
             decode_verification_token("any-token")
 
     # TWÓJ DOSKONAŁY TEST POKRYWAJĄCY BLOK `if`
     def test_decode_verification_token_wrong_type(self):
         bad_token = generate_access_token(self.user.id)
-        with self.assertRaisesMessage(AuthenticationFailed, "Invalid verification token"):
+        with self.assertRaisesMessage(
+            AuthenticationFailed, "Invalid verification token"
+        ):
             decode_verification_token(bad_token)
 
     def test_decode_password_reset_token_expired(self):
         with override_settings(PASSWORD_RESET_EXPIRATION_MINUTES=-1):
             token = generate_password_reset_token(self.user.id)
-            with self.assertRaisesMessage(AuthenticationFailed, "Password reset token expired"):
+            with self.assertRaisesMessage(
+                AuthenticationFailed, "Password reset token expired"
+            ):
                 decode_password_reset_token(token)
 
     # OSTATECZNY TEST POKRYWAJĄCY BLOK `except`
     @patch("accounts.utils.jwt.decode")
     def test_decode_password_reset_token_invalid_token_error(self, mock_jwt_decode):
         mock_jwt_decode.side_effect = jwt.InvalidTokenError
-        with self.assertRaisesMessage(AuthenticationFailed, "Invalid password reset token"):
+        with self.assertRaisesMessage(
+            AuthenticationFailed, "Invalid password reset token"
+        ):
             decode_password_reset_token("any-token")
 
     # TWÓJ DOSKONAŁY TEST POKRYWAJĄCY BLOK `if`
     def test_decode_password_reset_token_wrong_type(self):
         bad_token = generate_access_token(self.user.id)
-        with self.assertRaisesMessage(AuthenticationFailed, "Invalid password reset token"):
+        with self.assertRaisesMessage(
+            AuthenticationFailed, "Invalid password reset token"
+        ):
             decode_password_reset_token(bad_token)
 
 
@@ -233,14 +247,16 @@ class TestJWTAuthentication(APITestCase):
     def test_inactive_user_raises_exception(self):
         token = generate_access_token(self.inactive_user.id)
         request = self.factory.get("/", HTTP_AUTHORIZATION=f"Bearer {token}")
-        with self.assertRaisesMessage(AuthenticationFailed, "User account is inactive."):
+        with self.assertRaisesMessage(
+            AuthenticationFailed, "User account is inactive."
+        ):
             self.authenticator.authenticate(request)
 
     def test_user_not_found_raises_exception(self):
         token = generate_access_token(999)
         request = self.factory.get("/", HTTP_AUTHORIZATION=f"Bearer {token}")
         with self.assertRaisesMessage(
-                AuthenticationFailed, "User not found for the provided token."
+            AuthenticationFailed, "User not found for the provided token."
         ):
             self.authenticator.authenticate(request)
 
@@ -252,16 +268,18 @@ class TestJWTAuthentication(APITestCase):
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
         request = self.factory.get("/", HTTP_AUTHORIZATION=f"Bearer {token}")
         with self.assertRaisesMessage(
-                AuthenticationFailed, "Token payload does not contain user_id."
+            AuthenticationFailed, "Token payload does not contain user_id."
         ):
             self.authenticator.authenticate(request)
 
-    @patch('accounts.authentication.User.objects.get')
+    @patch("accounts.authentication.User.objects.get")
     def test_unexpected_error_during_authentication(self, mock_get_user):
         mock_get_user.side_effect = Exception("Database is down")
         token = generate_access_token(self.user.id)
         request = self.factory.get("/", HTTP_AUTHORIZATION=f"Bearer {token}")
-        with self.assertRaisesMessage(AuthenticationFailed, "An unexpected error occurred during authentication."):
+        with self.assertRaisesMessage(
+            AuthenticationFailed, "An unexpected error occurred during authentication."
+        ):
             self.authenticator.authenticate(request)
 
 
@@ -459,7 +477,7 @@ class AccountLoginAndUserViewTests(APITestCase):
         self.active_user.is_active = False
         self.active_user.save()
 
-        del self.client.cookies['access_token']
+        del self.client.cookies["access_token"]
         response = self.client.post(self.refresh_token_url, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -473,7 +491,7 @@ class AccountLoginAndUserViewTests(APITestCase):
         user_id_to_delete = self.active_user.id
         User.objects.filter(id=user_id_to_delete).delete()
 
-        del self.client.cookies['access_token']
+        del self.client.cookies["access_token"]
         response = self.client.post(self.refresh_token_url, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -562,11 +580,9 @@ class AccountPasswordResetTests(APITestCase):
 
     @patch("accounts.views.send_mail")
     def test_request_password_reset_nonexistent_or_inactive_user_no_email(
-            self, mock_send_mail
+        self, mock_send_mail
     ):
-        self.client.post(
-            self.request_reset_url, {"email": "no@one.com"}, format="json"
-        )
+        self.client.post(self.request_reset_url, {"email": "no@one.com"}, format="json")
         mock_send_mail.assert_not_called()
 
         self.user.is_active = False

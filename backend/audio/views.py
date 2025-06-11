@@ -13,7 +13,9 @@ from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
 
 class AudioFileUploadView(generics.ListCreateAPIView):
     serializer_class = AudioFileSerializer
-    permission_classes = [permissions.AllowAny]  # Zmieniamy z powrotem, aby pasowało do logiki
+    permission_classes = [
+        permissions.AllowAny
+    ]  # Zmieniamy z powrotem, aby pasowało do logiki
     authentication_classes = [JWTAuthentication]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -45,7 +47,7 @@ class LatestAudioFilesView(APIView):
         page_size = 10
         offset = (page - 1) * page_size
         queryset = AudioFile.objects.filter(is_public=True).order_by("-uploaded_at")
-        results = list(queryset[offset: offset + page_size])
+        results = list(queryset[offset : offset + page_size])
         serializer = AudioFileSerializer(results, many=True)
 
         has_more = queryset.count() > offset + page_size
