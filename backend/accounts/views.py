@@ -145,7 +145,7 @@ class RequestPasswordResetView(APIView):
         user = User.objects.filter(email=email).first()
         if user and user.is_active:
             token = generate_password_reset_token(user.id)
-            reset_link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password-confirm/?token={token}"
+            reset_link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password/?token={token}"
             send_mail(
                 "Password Reset Request",
                 f"Click the link to reset your password: {reset_link}",
