@@ -4,7 +4,6 @@ import { useRoute } from "vue-router";
 import AudioCard from "@/components/AudioCard.vue";
 import { useAuth } from "@/composables/useAuth";
 
-// Define interfaces locally for this page
 interface ApiAudioFile {
   id: number;
   uuid: string;
@@ -40,7 +39,6 @@ const fetchAudioFile = async () => {
   try {
     const response = await $api.get<ApiAudioFile>(`/api/audio/${uuid}/`);
     const fileData = response.data;
-    // Construct full URL for the audio file
     const fullFileUrl = new URL(fileData.file, config.public.mediaRoot).href;
     audioFile.value = { ...fileData, file: fullFileUrl };
   } catch (e: any) {
@@ -51,7 +49,6 @@ const fetchAudioFile = async () => {
   }
 };
 
-// Re-implement handlers for the single card on this page
 const handleVote = async (
   file: AudioFile,
   voteType: "like" | "dislike"
@@ -60,7 +57,6 @@ const handleVote = async (
     navigateTo("/login");
     return;
   }
-  // Optimistic UI update logic
   const originalVote = file.user_vote;
   const originalLikes = file.likes_count;
   const originalDislikes = file.dislikes_count;
@@ -81,14 +77,12 @@ const handleVote = async (
     });
   } catch (err) {
     console.error("Failed to save vote:", err);
-    // Revert on error
     file.user_vote = originalVote;
     file.likes_count = originalLikes;
     file.dislikes_count = originalDislikes;
   }
 };
 
-// The play handler is not needed here as the view count is incremented on page load
 const handlePlay = () => {};
 
 const toggleCommentSection = (uuid: string) => {

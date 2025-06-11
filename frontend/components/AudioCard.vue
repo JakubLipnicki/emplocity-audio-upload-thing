@@ -13,6 +13,7 @@ import {
   Lock,
   Eye,
   MessageCircle,
+  Copy,
 } from "lucide-vue-next";
 import {
   Tooltip,
@@ -22,7 +23,6 @@ import {
 } from "@/components/ui/tooltip";
 import CommentSection from "@/components/CommentSection.vue";
 
-// Define the props this component accepts
 const props = defineProps({
   audioFile: {
     type: Object,
@@ -40,10 +40,19 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  isLinkCopied: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-// Define the events this component can emit
-const emit = defineEmits(["vote", "play", "toggle-comments", "tag-click"]);
+const emit = defineEmits([
+  "vote",
+  "play",
+  "toggle-comments",
+  "tag-click",
+  "copy-link",
+]);
 
 const handleVote = (voteType: "like" | "dislike") => {
   emit("vote", props.audioFile, voteType);
@@ -61,6 +70,10 @@ const onTagClick = (tagName: string) => {
   emit("tag-click", tagName);
 };
 
+const onCopyLink = () => {
+  emit("copy-link", props.audioFile.uuid);
+};
+
 const formatDate = (dateString: string) => {
   const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
@@ -75,7 +88,23 @@ const formatDate = (dateString: string) => {
   <Card>
     <CardContent class="p-6">
       <div class="flex justify-between items-start gap-2">
-        <CardTitle>{{ audioFile.title }}</CardTitle>
+        <div
+          @click="onCopyLink"
+          class="flex items-center gap-2 cursor-pointer group"
+        >
+          <CardTitle class="group-hover:text-primary transition-colors">{{
+            audioFile.title
+          }}</CardTitle>
+          <span
+            v-if="isLinkCopied"
+            class="text-sm font-medium text-green-600"
+            >Copied!</span
+          >
+          <Copy
+            v-else
+            class="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+          />
+        </div>
         <TooltipProvider :delay-duration="100">
           <Tooltip>
             <TooltipTrigger>

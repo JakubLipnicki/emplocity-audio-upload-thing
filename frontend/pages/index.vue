@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
-import { useWindowFocus } from "@vueuse/core";
+import { useWindowFocus, useClipboard } from "@vueuse/core";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-vue-next";
 import AudioCard from "@/components/AudioCard.vue";
 
-// Define interfaces
 interface ApiAudioFile {
   id: number;
   uuid: string;
@@ -27,7 +26,6 @@ interface ApiTag {
   name: string;
 }
 
-// Component state
 const latestAudioFiles = ref<AudioFile[]>([]);
 const loading = ref(true);
 const loadingMore = ref(false);
@@ -40,12 +38,21 @@ const activeTags = ref<string[]>([]);
 const allTags = ref<string[]>([]);
 const tagsLoading = ref(true);
 
-// Composables and plugins
+const sourceLinkToCopy = ref("");
+const lastCopiedUuid = ref<string | null>(null);
+const { copy, copied } = useClipboard({ source: sourceLinkToCopy });
+
 const { $api } = useNuxtApp();
 const { isAuthenticated } = useAuth();
 const isFocused = useWindowFocus();
 
-// Event Handlers
+const handleCopyLink = (uuid: string) => {
+  const link = `${window.location.origin}/audio/${uuid}`;
+  sourceLinkToCopy.value = link;
+  copy();
+  lastCopiedUuid.value = uuid;
+};
+
 const toggleCommentSection = (uuid: string) => {
   if (!isAuthenticated.value) {
     navigateTo("/login");
@@ -123,7 +130,6 @@ const handlePlay = async (file: AudioFile) => {
   }
 };
 
-// Data Fetching
 const resetAndFetch = () => {
   latestAudioFiles.value = [];
   page.value = 1;
@@ -186,11 +192,16 @@ const fetchAllTags = async () => {
   }
 };
 
-// Lifecycle Hooks
 watch(isFocused, (isNowFocused) => {
   if (isNowFocused && !loading.value) {
     activeTags.value = [];
     resetAndFetch();
+  }
+});
+
+watch(copied, (isCopied) => {
+  if (!isCopied) {
+    lastCopiedUuid.value = null;
   }
 });
 
@@ -204,7 +215,6 @@ onMounted(() => {
   <div>
     <h2 class="text-2xl font-bold mb-4 text-center">Przeglądaj pliki!</h2>
 
-    <!-- All Tags Filter Section -->
     <div v-if="tagsLoading" class="text-center text-gray-500 my-4">
       Wczytywanie tagów...
     </div>
@@ -223,7 +233,6 @@ onMounted(() => {
       </Button>
     </div>
 
-    <!-- Active Filter Status Indicator -->
     <div
       v-if="activeTags.length > 0 && !loading"
       class="mb-4 flex items-center justify-between gap-4 p-3 bg-muted rounded-lg"
@@ -244,7 +253,6 @@ onMounted(() => {
       </Button>
     </div>
 
-    <!-- Main Content Area -->
     <div v-if="loading" class="text-center">Wczytywanie...</div>
     <div v-else-if="error" class="text-center text-red-500">
       Error : {{ error }}
@@ -257,7 +265,6 @@ onMounted(() => {
         Brak plikow
       </div>
       <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <!-- Use the new AudioCard component -->
         <AudioCard
           v-for="audioFile in latestAudioFiles"
           :key="audioFile.id"
@@ -265,13 +272,14 @@ onMounted(() => {
           :is-authenticated="isAuthenticated"
           :active-comment-section="activeCommentSection"
           :active-tags="activeTags"
+          :is-link-copied="lastCopiedUuid === audioFile.uuid"
           @vote="handleVote"
           @play="handlePlay"
           @toggle-comments="toggleCommentSection"
           @tag-click="handleTagClick"
+          @copy-link="handleCopyLink"
         />
       </div>
-      <!-- Load More Section -->
       <div class="mt-8 text-center">
         <Button
           v-if="hasMore && !loadingMore"
