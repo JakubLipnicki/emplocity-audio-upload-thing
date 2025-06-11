@@ -100,8 +100,8 @@
 
         <div class="flex items-center justify-between pt-2">
           <div class="flex items-center space-x-2">
-            <Switch id="is-public-switch" v-model:checked="isPublic" />
-            <Label for="is-public-switch">Publiczny</Label>
+            <Switch id="is-public-switch" v-model="isPublic" />
+      <Label for="is-public-switch">Publiczny</Label>
           </div>
 
           <button
@@ -242,6 +242,13 @@ const uploadFile = async () => {
     selectedTags.value.forEach((tag) => {
       formData.append("tags", tag);
     });
+
+    console.log(
+      "Value of is_public being sent:",
+      isPublic.value,
+      "as string:",
+      isPublic.value.toString()
+    );
 
     const headers = {};
     if (accessToken.value) {

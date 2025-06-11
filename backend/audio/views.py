@@ -11,30 +11,19 @@ from .models import AudioFile, Like, Tag
 from .serializers import AudioFileSerializer, LikeSerializer, TagSerializer
 
 
-class AudioFileUploadView(generics.ListCreateAPIView):
+class AudioFileUploadView(generics.CreateAPIView): # Changed to CreateAPIView
+    
     serializer_class = AudioFileSerializer
-    permission_classes = [permissions.AllowAny]  # Zmieniamy z powrotem, aby pasowało do logiki
+    permission_classes = [permissions.AllowAny] # Allows anonymous or registered uploads
     authentication_classes = [JWTAuthentication]
     parser_classes = [MultiPartParser, FormParser]
 
-    def get_queryset(self):
-        user = self.request.user
-        # Jeśli użytkownik jest zalogowany, metoda GET powinna zwrócić JEGO pliki
-        if user and user.is_authenticated:
-            return AudioFile.objects.filter(user=user).order_by("-uploaded_at")
-        # Jeśli użytkownik jest anonimowy, metoda GET nie powinna zwracać nic (chyba że taka jest intencja)
-        # Aby dopasować się do testu, który zakłada, że anonimowy widzi pliki publiczne:
-        return AudioFile.objects.filter(is_public=True).order_by("-uploaded_at")
-
     def perform_create(self, serializer):
-        # Metoda POST jest dozwolona dla każdego, ale zapisujemy usera, jeśli jest zalogowany
+        
         user = self.request.user if self.request.user.is_authenticated else None
-
-        # Poprawiona obsługa 'is_public'
-        is_public_raw = self.request.data.get("is_public", "false")  # Domyślnie false
-        is_public = str(is_public_raw).lower() == "true"
-
-        serializer.save(user=user, is_public=is_public)
+        # Let the serializer handle all fields from the request data.
+        # We only need to inject the user if they are authenticated.
+        serializer.save(user=user)
 
 
 class LatestAudioFilesView(APIView):
@@ -55,6 +44,18 @@ class LatestAudioFilesView(APIView):
                 "has_more": has_more,
                 "page": page,
             }
+        )
+
+class UserUploadedAudioFilesView(generics.ListAPIView):
+    
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = AudioFileSerializer
+
+    def get_queryset(self):
+    
+        return AudioFile.objects.filter(user=self.request.user).order_by(
+            "-uploaded_at"
         )
 
 

@@ -11,6 +11,7 @@ from .views import (
     TagListView,
     TopRatedAudioFilesView,
     UserLikedAudioFilesView,
+    UserUploadedAudioFilesView,
 )
 
 app_name = "audio"
@@ -25,8 +26,9 @@ urlpatterns = [
         name="audio-likes-count",
     ),
     path("<uuid:uuid>/", AudioFileDetailByUUIDView.as_view(), name="audio-detail"),
-    path("delete/<uuid:uuid>/", AudioFileDeleteView.as_view(), name="audio-delete"),
+    path("<uuid:uuid>/delete/", AudioFileDeleteView.as_view(), name="audio-delete"),
     path("liked/", UserLikedAudioFilesView.as_view(), name="user-liked-audio"),
+    path("my-files/", UserUploadedAudioFilesView.as_view(), name="user-uploaded-files"),
     path("tags/", TagListView.as_view(), name="tag-list"),
     path("tags/<str:tag_name>/", AudioFilesByTagView.as_view(), name="audio-by-tag"),
     path("top-rated/", TopRatedAudioFilesView.as_view(), name="audio-top-rated"),
